@@ -68,6 +68,33 @@ export interface ApiSettings {
 }
 
 // =========================================
+// Tipografia avancada (por texto)
+// =========================================
+export interface TypographyConfig {
+  visible: boolean;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: '300' | '400' | '500' | '600' | '700' | '800' | '900';
+  lineHeight: number;
+  letterSpacing: number;
+  textAlign: 'left' | 'center' | 'right';
+  verticalAlign: 'top' | 'middle' | 'bottom';
+  color: string;
+  useUppercase: boolean;
+  useUnderline: boolean;
+  shadowEnabled: boolean;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
+  highlightEnabled: boolean;
+  highlightColor: string;
+  highlightPaddingX: number;
+  highlightPaddingY: number;
+  highlightBorderRadius: number;
+}
+
+// =========================================
 // Sistema de Projetos Salvos (Meus Projetos)
 // =========================================
 
@@ -110,6 +137,12 @@ export interface SavedSingleImageData {
   // Glows da marca
   showBrandGlows: boolean;
   glowIntensity: number;
+  // Configuracoes tipograficas avancadas
+  tagConfig: TypographyConfig;
+  headlineConfig: TypographyConfig;
+  highlightConfig: TypographyConfig;
+  sublineConfig: TypographyConfig;
+  ctaConfig: TypographyConfig;
   personImage: string | null;
   personPosition: 'right' | 'left' | 'center';
   personScale: number;

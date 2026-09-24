@@ -25,10 +25,18 @@ import {
   Image as ImgIcon,
   Save,
   RefreshCw,
+  Type,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
 import { CreativeDirectorPanel } from '@/components/CreativeDirectorPanel';
+import {
+  TypographyControl,
+  DEFAULT_TYPOGRAPHY,
+  TypographyConfig,
+  buildTextStyle,
+  buildContainerStyle,
+} from '@/components/TypographyControl';
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -143,6 +151,50 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [headlineFont, setHeadlineFont] = useState(brand.fontHeadline);
   const [textAlignment, setTextAlignment] = useState<'left' | 'center'>('left');
 
+  // CONFIGURACOES TIPOGRAFICAS AVANCADAS (um TypographyConfig por texto)
+  const [tagConfig, setTagConfig] = useState<TypographyConfig>({
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamily: brand.fontHeadline,
+    fontSize: 14,
+    fontWeight: '800',
+    color: brand.primaryColor,
+    useUppercase: true,
+    letterSpacing: 1,
+  });
+  const [headlineConfig, setHeadlineConfig] = useState<TypographyConfig>({
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamily: brand.fontHeadline,
+    fontSize: 48,
+    fontWeight: '800',
+    color: brand.textColor,
+    lineHeight: 1.05,
+    letterSpacing: -1.5,
+  });
+  const [highlightConfig, setHighlightConfig] = useState<TypographyConfig>({
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamily: brand.fontHeadline,
+    fontSize: 24,
+    fontWeight: '700',
+    color: brand.primaryColor,
+  });
+  const [sublineConfig, setSublineConfig] = useState<TypographyConfig>({
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamily: brand.fontBody,
+    fontSize: 14,
+    fontWeight: '400',
+    color: brand.accentTextColor,
+    lineHeight: 1.5,
+  });
+  const [ctaConfig, setCtaConfig] = useState<TypographyConfig>({
+    ...DEFAULT_TYPOGRAPHY,
+    fontFamily: brand.fontHeadline,
+    fontSize: 14,
+    fontWeight: '700',
+    color: brand.backgroundColor,
+    useUppercase: true,
+    letterSpacing: 0.5,
+  });
+
   // Galeria de imagens geradas
   const [generatedGallery, setGeneratedGallery] = useState<string[]>([]);
 
@@ -165,6 +217,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         gradientOpacity,
         showBrandGlows,
         glowIntensity,
+        tagConfig,
+        headlineConfig,
+        highlightConfig,
+        sublineConfig,
+        ctaConfig,
         personImage,
         personPosition,
         personScale,
@@ -204,6 +261,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if (typeof data.gradientOpacity === 'number') setGradientOpacity(data.gradientOpacity);
         if (typeof data.showBrandGlows === 'boolean') setShowBrandGlows(data.showBrandGlows);
         if (typeof data.glowIntensity === 'number') setGlowIntensity(data.glowIntensity);
+        if (data.tagConfig) setTagConfig(data.tagConfig);
+        if (data.headlineConfig) setHeadlineConfig(data.headlineConfig);
+        if (data.highlightConfig) setHighlightConfig(data.highlightConfig);
+        if (data.sublineConfig) setSublineConfig(data.sublineConfig);
+        if (data.ctaConfig) setCtaConfig(data.ctaConfig);
         if ('personImage' in data) setPersonImage(data.personImage);
         if (data.personPosition) setPersonPosition(data.personPosition);
         if (typeof data.personScale === 'number') setPersonScale(data.personScale);
@@ -245,6 +307,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     gradientOpacity,
     showBrandGlows,
     glowIntensity,
+    tagConfig,
+    headlineConfig,
+    highlightConfig,
+    sublineConfig,
+    ctaConfig,
     personImage,
     personPosition,
     personScale,
@@ -721,31 +788,37 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
 
-              {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO */}
+              {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO (com tipografia avancada) */}
               {showText && (
                 <div
-                  className={`relative z-20 w-full h-full flex flex-col justify-between p-6 sm:p-10 ${
-                    textAlignment === 'center' ? 'items-center text-center' : 'items-start text-left'
-                  }`}
+                  className="relative z-20 w-full h-full p-6 sm:p-10"
+                  style={buildContainerStyle(
+                    { ...headlineConfig, verticalAlign: 'bottom' },
+                    'bottom'
+                  )}
                 >
-                  {/* TOPO: BARRA SUPERIOR 100% EDITÁVEL POR ELEMENTO */}
+                  {/* TOPO: BARRA SUPERIOR 100% EDITAVEL POR ELEMENTO */}
                   {showTopBar && (
-                    <div className={`flex items-center gap-3 flex-wrap ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}>
-                      {/* TAG */}
-                      {showTag && tag && (
+                    <div className={`flex items-center gap-3 flex-wrap self-stretch mb-3 ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}>
+                      {/* TAG com tipografia customizada */}
+                      {showTag && tag && tagConfig.visible && (
                         <span
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider shadow-sm"
+                          className="inline-flex items-center gap-1.5 shadow-sm"
                           style={{
-                            backgroundColor: `${brand.primaryColor}25`,
-                            color: brand.primaryColor,
-                            borderLeft: `3px solid ${brand.primaryColor}`,
+                            ...buildTextStyle(tagConfig),
+                            backgroundColor: tagConfig.highlightEnabled
+                              ? tagConfig.highlightColor
+                              : `${tagConfig.color}25`,
+                            borderLeft: `3px solid ${tagConfig.color}`,
+                            padding: `${tagConfig.highlightPaddingY}px ${tagConfig.highlightPaddingX}px`,
+                            borderRadius: `${tagConfig.highlightBorderRadius}px`,
                           }}
                         >
                           {tag}
                         </span>
                       )}
 
-                      {/* HANDLE / TEXTO CUSTOMIZADO (substitui a lógica antiga) */}
+                      {/* HANDLE / TEXTO CUSTOMIZADO */}
                       {showHandle && (
                         <span
                           className="text-[11px] font-bold tracking-tight opacity-75"
@@ -774,63 +847,114 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     </div>
                   )}
 
-                  {/* MEIO/BASE: HEADLINE + DESTAQUE + SUBLINE + CTA */}
+                  {/* MEIO/BASE: TEXTOS PRINCIPAIS */}
                   <div
-                    className={`space-y-3.5 ${
+                    className={`flex flex-col w-full ${
                       personPosition === 'right' && textAlignment === 'left' ? 'max-w-[62%]' : 'max-w-full'
                     }`}
+                    style={{
+                      gap: `${headlineConfig.lineHeight * 0.7}em`,
+                      textAlign: headlineConfig.textAlign,
+                      alignItems:
+                        headlineConfig.textAlign === 'center'
+                          ? 'center'
+                          : headlineConfig.textAlign === 'right'
+                          ? 'flex-end'
+                          : 'flex-start',
+                    }}
                   >
-                    {/* Headline Principal */}
-                    <h1
-                      className={`font-extrabold tracking-tight leading-[1.08] ${
-                        format === '16:9'
-                          ? 'text-3xl sm:text-4xl'
-                          : format === '9:16'
-                          ? 'text-3xl sm:text-4xl'
-                          : 'text-2xl sm:text-3xl'
-                      }`}
-                      style={{
-                        fontFamily: headlineFont,
-                        color: brand.textColor,
-                      }}
-                    >
-                      {headline}
-                    </h1>
+                    {/* HEADLINE PRINCIPAL */}
+                    {headlineConfig.visible && headline && (
+                      <h1
+                        style={{
+                          ...buildTextStyle(headlineConfig),
+                          margin: 0,
+                          // Escala por formato
+                          fontSize: `${
+                            format === '16:9'
+                              ? headlineConfig.fontSize * 0.9
+                              : format === '9:16'
+                              ? headlineConfig.fontSize * 1.1
+                              : headlineConfig.fontSize
+                          }px`,
+                        }}
+                      >
+                        {headline}
+                      </h1>
+                    )}
 
-                    {/* Frase de Destaque */}
-                    {highlightText && (
+                    {/* FRASE DE DESTAQUE */}
+                    {highlightConfig.visible && highlightText && (
                       <p
-                        className={`font-black tracking-tight leading-tight ${
-                          format === '16:9' ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'
-                        }`}
-                        style={{ color: brand.primaryColor }}
+                        style={{
+                          ...buildTextStyle(highlightConfig),
+                          margin: 0,
+                          fontSize: `${
+                            format === '16:9'
+                              ? highlightConfig.fontSize * 0.85
+                              : highlightConfig.fontSize
+                          }px`,
+                          backgroundColor: highlightConfig.highlightEnabled ? highlightConfig.highlightColor : 'transparent',
+                          padding: highlightConfig.highlightEnabled
+                            ? `${highlightConfig.highlightPaddingY}px ${highlightConfig.highlightPaddingX}px`
+                            : '0',
+                          borderRadius: highlightConfig.highlightEnabled ? `${highlightConfig.highlightBorderRadius}px` : '0',
+                          display: highlightConfig.highlightEnabled ? 'inline-block' : 'inline',
+                          width: highlightConfig.highlightEnabled ? 'fit-content' : 'auto',
+                        }}
                       >
                         {highlightText}
                       </p>
                     )}
 
-                    {/* Subline */}
-                    {subline && (
+                    {/* SUBTITULO */}
+                    {sublineConfig.visible && subline && (
                       <p
-                        className="text-xs sm:text-sm font-medium leading-relaxed opacity-85"
-                        style={{ color: brand.accentTextColor }}
+                        style={{
+                          ...buildTextStyle(sublineConfig),
+                          margin: 0,
+                          fontSize: `${
+                            format === '16:9'
+                              ? sublineConfig.fontSize * 0.85
+                              : sublineConfig.fontSize
+                          }px`,
+                          backgroundColor: sublineConfig.highlightEnabled ? sublineConfig.highlightColor : 'transparent',
+                          padding: sublineConfig.highlightEnabled
+                            ? `${sublineConfig.highlightPaddingY}px ${sublineConfig.highlightPaddingX}px`
+                            : '0',
+                          borderRadius: sublineConfig.highlightEnabled
+                            ? `${sublineConfig.highlightBorderRadius}px`
+                            : '0',
+                          display: sublineConfig.highlightEnabled ? 'inline-block' : 'block',
+                          width: sublineConfig.highlightEnabled ? 'fit-content' : 'auto',
+                        }}
                       >
                         {subline}
                       </p>
                     )}
 
-                    {/* Botão de Chamada para Ação (CTA) */}
-                    {showCta && ctaText && (
-                      <div className="pt-2">
+                    {/* CTA */}
+                    {showCta && ctaText && ctaConfig.visible && (
+                      <div className={ctaConfig.textAlign === 'center' ? 'self-center' : ctaConfig.textAlign === 'right' ? 'self-end' : 'self-start'}>
                         <span
-                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs tracking-wider uppercase shadow-xl transition-all"
+                          className="inline-flex items-center gap-2 transition-all"
                           style={{
-                            backgroundColor: brand.primaryColor,
-                            color: brand.backgroundColor,
-                            boxShadow: `0 10px 25px -5px ${brand.primaryColor}50`,
+                            ...buildTextStyle(ctaConfig),
+                            backgroundColor: ctaConfig.color,
+                            color: ctaConfig.highlightEnabled ? ctaConfig.highlightColor : brand.backgroundColor,
+                            padding: `${ctaConfig.highlightPaddingY + 6}px ${ctaConfig.highlightPaddingX + 16}px`,
+                            borderRadius: `${ctaConfig.highlightBorderRadius}px`,
+                            fontSize: `${ctaConfig.fontSize}px`,
+                            fontWeight: ctaConfig.fontWeight,
+                            textTransform: ctaConfig.useUppercase ? 'uppercase' : 'none',
+                            fontFamily: ctaConfig.fontFamily,
+                            letterSpacing: `${ctaConfig.letterSpacing}px`,
+                            boxShadow: ctaConfig.shadowEnabled
+                              ? `${ctaConfig.shadowOffsetX}px ${ctaConfig.shadowOffsetY}px ${ctaConfig.shadowBlur}px ${ctaConfig.shadowColor}`
+                              : `0 10px 25px -5px ${brand.primaryColor}50`,
                           }}
                         >
-                          <MousePointerClick size={14} />
+                          <MousePointerClick size={Math.max(12, ctaConfig.fontSize * 0.9)} />
                           {ctaText}
                         </span>
                       </div>
@@ -1609,109 +1733,131 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             )}
           </div>
 
-          {/* SEÇÃO 6: TEXTOS E TIPOGRAFIA */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
+          {/* SEÇÃO 6: TEXTOS & TIPOGRAFIA AVANCADA */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Wand2 size={16} className="text-brand-400" /> Textos & Copy
+                <Type size={16} className="text-brand-400" /> Textos & Tipografia
               </h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setTextAlignment(textAlignment === 'left' ? 'center' : 'left')}
                   className="text-xs text-gray-400 hover:text-white px-2 py-0.5 rounded bg-white/5"
+                  title="Alternar alinhamento horizontal"
                 >
-                  {textAlignment === 'left' ? 'Alinhar Centro' : 'Alinhar Esquerda'}
+                  {textAlignment === 'left' ? '↔ Alinhar Centro' : '↔ Alinhar Esquerda'}
                 </button>
               </div>
             </div>
 
-            <div className="space-y-3">
-              {/* Seleção de Fonte da Headline */}
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-                  Fonte da Headline (do seu PC ou Marca)
-                </label>
-                <select
-                  value={headlineFont}
-                  onChange={(e) => setHeadlineFont(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold focus:border-brand-500 focus:outline-none"
-                >
-                  <option value={brand.fontHeadline} className="bg-[#11131a]">
-                    {brand.fontHeadline} (Padrão do Cliente)
-                  </option>
-                  {localFonts.map((f) => (
-                    <option key={f.family} value={f.family} className="bg-[#11131a]">
-                      🔤 {f.family} (Fonte do seu PC)
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <p className="text-[10px] text-gray-500 leading-relaxed">
+              💡 Clique em <strong>▼ (chevron)</strong> ao lado de cada texto para abrir o painel completo de tipografia (fonte, tamanho, peso, cor, espaçamento, sombra e caixa de destaque).
+            </p>
 
-              {/* Tag Superior */}
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-400 mb-1">Tag / Categoria</label>
+            {/* TAG / CATEGORIA */}
+            <input
+              type="text"
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              placeholder="MÉTODO EXCLUSIVO"
+              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+            />
+            <TypographyControl
+              label="Tag / Categoria"
+              config={tagConfig}
+              onChange={setTagConfig}
+              defaultColor={brand.primaryColor}
+              localFonts={localFonts}
+              brandHeadlineFont={brand.fontHeadline}
+              brandBodyFont={brand.fontBody}
+            />
+
+            {/* HEADLINE */}
+            <textarea
+              rows={2}
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder="COMO DOBRAR SUAS CONVERSÕES NO META ADS"
+              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:border-brand-500 focus:outline-none resize-none"
+            />
+            <TypographyControl
+              label="Headline Principal"
+              config={headlineConfig}
+              onChange={setHeadlineConfig}
+              defaultColor={brand.textColor}
+              localFonts={localFonts}
+              brandHeadlineFont={brand.fontHeadline}
+              brandBodyFont={brand.fontBody}
+            />
+
+            {/* FRASE DE DESTAQUE */}
+            <textarea
+              rows={2}
+              value={highlightText}
+              onChange={(e) => setHighlightText(e.target.value)}
+              placeholder="Sem gastar mais em tráfego"
+              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold focus:border-brand-500 focus:outline-none resize-none"
+              style={{ color: brand.primaryColor }}
+            />
+            <TypographyControl
+              label="Frase de Destaque"
+              config={highlightConfig}
+              onChange={setHighlightConfig}
+              defaultColor={brand.primaryColor}
+              localFonts={localFonts}
+              brandHeadlineFont={brand.fontHeadline}
+              brandBodyFont={brand.fontBody}
+            />
+
+            {/* SUBTITULO */}
+            <input
+              type="text"
+              value={subline}
+              onChange={(e) => setSubline(e.target.value)}
+              placeholder="Aprenda o passo a passo validado por especialistas."
+              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs focus:border-brand-500 focus:outline-none"
+            />
+            <TypographyControl
+              label="Subtítulo"
+              config={sublineConfig}
+              onChange={setSublineConfig}
+              defaultColor={brand.accentTextColor}
+              localFonts={localFonts}
+              brandHeadlineFont={brand.fontHeadline}
+              brandBodyFont={brand.fontBody}
+            />
+
+            {/* CTA */}
+            <div className="flex items-center justify-between">
+              <input
+                type="text"
+                value={ctaText}
+                onChange={(e) => setCtaText(e.target.value)}
+                placeholder="QUERO APRENDER AGORA"
+                className="flex-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+                disabled={!showCta}
+              />
+              <label className="inline-flex items-center gap-1.5 px-2 cursor-pointer ml-2">
                 <input
-                  type="text"
-                  value={tag}
-                  onChange={(e) => setTag(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+                  type="checkbox"
+                  checked={showCta}
+                  onChange={(e) => setShowCta(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-emerald-500"
                 />
-              </div>
-
-              {/* Headline */}
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-400 mb-1">Headline Principal</label>
-                <textarea
-                  rows={2}
-                  value={headline}
-                  onChange={(e) => setHeadline(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:border-brand-500 focus:outline-none resize-none"
-                />
-              </div>
-
-              {/* Destaque */}
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-400 mb-1">Frase de Destaque (Cor)</label>
-                <textarea
-                  rows={2}
-                  value={highlightText}
-                  onChange={(e) => setHighlightText(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-brand-400 text-xs font-semibold focus:border-brand-500 focus:outline-none resize-none"
-                />
-              </div>
-
-              {/* Subline */}
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-400 mb-1">Subtítulo</label>
-                <input
-                  type="text"
-                  value={subline}
-                  onChange={(e) => setSubline(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs focus:border-brand-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Botão CTA */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-semibold text-gray-400">Botão de Ação (CTA)</label>
-                  <input
-                    type="checkbox"
-                    checked={showCta}
-                    onChange={(e) => setShowCta(e.target.checked)}
-                    className="accent-emerald-500"
-                  />
-                </div>
-                {showCta && (
-                  <input
-                    type="text"
-                    value={ctaText}
-                    onChange={(e) => setCtaText(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
-                  />
-                )}
-              </div>
+                <span className="text-[10px] text-gray-400 font-bold">CTA</span>
+              </label>
             </div>
+            {showCta && (
+              <TypographyControl
+                label="Botão de Ação (CTA)"
+                config={ctaConfig}
+                onChange={setCtaConfig}
+                defaultColor={brand.backgroundColor}
+                localFonts={localFonts}
+                brandHeadlineFont={brand.fontHeadline}
+                brandBodyFont={brand.fontBody}
+              />
+            )}
           </div>
         </div>
       </div>
