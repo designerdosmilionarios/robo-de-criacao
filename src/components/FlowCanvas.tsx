@@ -23,6 +23,7 @@ import {
 export type BlockType =
   | 'briefing'
   | 'logo'
+  | 'reference'
   | 'style'
   | 'copy-output'
   | 'image-output'
@@ -75,6 +76,13 @@ const BLOCK_CONFIG: Record<BlockType, {
     bgColor: 'bg-purple-500/5',
     description: 'Logo / imagem de referência',
   },
+  reference: {
+    icon: ImageIcon,
+    color: 'text-fuchsia-400',
+    borderColor: 'border-fuchsia-500/40 hover:border-fuchsia-500',
+    bgColor: 'bg-fuchsia-500/5',
+    description: 'Referência visual (estilo, paleta)',
+  },
   style: {
     icon: Palette,
     color: 'text-pink-400',
@@ -112,6 +120,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [connecting, setConnecting] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
+  const [loadingReferences, setLoadingReferences] = useState(false);
+  const [referencesError, setReferencesError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -133,6 +143,42 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const handleRemoveBlock = (id: string) => {
     setBlocks((prev) => prev.filter((b) => b.id !== id));
     setConnections((prev) => prev.filter((c) => c.from !== id && c.to !== id));
+  };
+
+  // Importar imagens da pasta REFERENCIAS como blocos
+  const handleImportReferences = async () => {
+    setLoadingReferences(true);
+    setReferencesError(null);
+    try {
+      const res = await fetch('/api/list-references');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao listar referencias.');
+      }
+      // Criar um bloco de referencia para cada imagem retornada
+      const newBlocks: FlowBlock[] = (data.references || []).map((ref: any, i: number) => ({
+        id: `ref-${Date.now()}-${i}`,
+        type: 'reference' as BlockType,
+        label: ref.filename.substring(0, 18),
+        x: 50 + (i % 6) * 260,
+        y: 500 + Math.floor(i / 6) * 180,
+        data: {
+          imageUrl: ref.base64 || null,
+          filename: ref.filename,
+          sizeKB: ref.sizeKB,
+        },
+      }));
+      setBlocks((prev) => [...prev, ...newBlocks]);
+      if (data.truncated) {
+        alert(
+          `Importamos ${newBlocks.length} imagens. A pasta tem ${data.total} arquivos no total - o sistema limita a 30 por importacao para nao travar. Use o botao "Referencia" individualmente para outras.`
+        );
+      }
+    } catch (err: any) {
+      setReferencesError(err.message);
+    } finally {
+      setLoadingReferences(false);
+    }
   };
 
   // Iniciar drag de bloco
@@ -207,6 +253,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     const briefing = inputBlocks.find((b) => b.type === 'briefing')?.data?.text || '';
     const style = inputBlocks.find((b) => b.type === 'style')?.data;
     const logo = inputBlocks.find((b) => b.type === 'logo')?.data?.imageUrl;
+    const references = inputBlocks
+      .filter((b) => b.type === 'reference' && b.data?.imageUrl)
+      .map((b) => b.data.imageUrl as string);
 
     if (!briefing && (block.type === 'copy-output' || block.type === 'image-output' || block.type === 'variations-output')) {
       alert('Conecte um bloco "Briefing" antes deste bloco de output. Arraste da bolinha direita do Briefing para a esquerda deste bloco.');
@@ -226,7 +275,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         const count = block.type === 'image-output' ? 1 : 4;
         const imageUrls: string[] = [];
         for (let i = 0; i < count; i++) {
-          const url = await generateImage(briefing, style, logo, apiKey);
+          const url = await generateImage(briefing, style, logo, apiKey, references);
           if (url) imageUrls.push(url);
         }
         setBlocks((prev) =>
@@ -266,6 +315,21 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 border border-purple-500/30"
           >
             <ImageIcon size={12} /> Logo
+          </button>
+          <button
+            onClick={() => handleCreateBlock('reference')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20 border border-fuchsia-500/30"
+          >
+            <ImageIcon size={12} /> Referência
+          </button>
+          <button
+            onClick={handleImportReferences}
+            disabled={loadingReferences}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 disabled:opacity-50"
+            title="Importa ate 30 imagens da pasta REFERENCIAS/ como blocos"
+          >
+            {loadingReferences ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+            Importar Pasta ({375})
           </button>
           <button
             onClick={() => handleCreateBlock('style')}
@@ -483,6 +547,70 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
+                {block.type === 'reference' && (
+                  <div>
+                    {block.data.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={block.data.imageUrl}
+                          alt={block.data.filename || 'ref'}
+                          className="w-full h-20 object-cover rounded-md"
+                          title={block.data.filename}
+                        />
+                        <button
+                          onClick={() => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id
+                                  ? { ...b, data: { ...b.data, imageUrl: null, filename: null } }
+                                  : b
+                              )
+                            );
+                          }}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
+                        >
+                          <X size={10} />
+                        </button>
+                        {block.data.filename && (
+                          <p className="text-[8px] text-gray-400 mt-1 truncate">{block.data.filename}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-white/15 rounded-md cursor-pointer hover:border-white/30 transition-colors">
+                        <Upload size={14} className="text-gray-400 mb-0.5" />
+                        <span className="text-[9px] text-gray-500">Upload ref</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id
+                                    ? {
+                                        ...b,
+                                        data: {
+                                          ...b.data,
+                                          imageUrl: reader.result as string,
+                                          filename: file.name,
+                                        },
+                                      }
+                                    : b
+                                )
+                              );
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
+
                 {block.type === 'style' && (
                   <div className="space-y-1">
                     <select
@@ -619,6 +747,7 @@ function getDefaultLabel(type: BlockType): string {
   switch (type) {
     case 'briefing': return 'Briefing';
     case 'logo': return 'Logo';
+    case 'reference': return 'Referência';
     case 'style': return 'Estilo';
     case 'copy-output': return 'Gerar Copy (4x)';
     case 'image-output': return 'Gerar Imagem';
@@ -630,6 +759,7 @@ function getDefaultData(type: BlockType): any {
   switch (type) {
     case 'briefing': return { text: '' };
     case 'logo': return { imageUrl: null };
+    case 'reference': return { imageUrl: null, filename: null };
     case 'style': return { tone: '', color: '#10b981' };
     default: return {};
   }
@@ -666,20 +796,31 @@ async function generateImage(
   prompt: string,
   style: any,
   logoUrl: string | undefined,
-  apiKey: string
+  apiKey: string,
+  references: string[] = []
 ): Promise<string | null> {
   try {
+    // Enriquece o prompt mencionando que ha referencias visuais
+    const enhancedPrompt = references.length > 0
+      ? `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}. This image has ${references.length} visual reference(s) attached - use them as inspiration for style, composition, and mood.`
+      : `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}`;
+
     const res = await fetch('/api/generate-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt: `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}`,
+        prompt: enhancedPrompt,
         size: '1024x1024',
         aspectRatio: '1:1',
         provider: 'openai',
         preferredModel: 'auto',
         apiKey,
-        ...(logoUrl ? { imageBase64: logoUrl.replace(/^data:image\/\w+;base64,/, '') } : {}),
+        // Prioridade: referencia principal (logo ou primeira reference)
+        ...(logoUrl
+          ? { imageBase64: logoUrl.replace(/^data:image\/\w+;base64,/, '') }
+          : references[0]
+          ? { imageBase64: references[0].replace(/^data:image\/\w+;base64,/, '') }
+          : {}),
       }),
     });
     const data = await res.json();
