@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
+import { CreativeDirectorPanel } from '@/components/CreativeDirectorPanel';
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -984,6 +985,21 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               )}
             </div>
           </div>
+
+          {/* SEÇÃO 0: DIRETOR CRIATIVO IA - INTELIGENCIA CRIATIVA */}
+          <CreativeDirectorPanel
+            onApplyPrompt={(text) => setBgPrompt(text)}
+            onApplyHeadline={(text) => setHeadline(text)}
+            onApplyHighlight={(text) => setHighlightText(text)}
+            onApplySubline={(text) => setSubline(text)}
+            onApplyCta={(text) => setCtaText(text)}
+            onApplyTag={(text) => setTag(text)}
+            brandColors={{
+              primaryColor: brand.primaryColor,
+              secondaryColor: brand.secondaryColor,
+              backgroundColor: brand.backgroundColor,
+            }}
+          />
 
           {/* SEÇÃO 4: PESSOA REAL */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
