@@ -503,7 +503,7 @@ export default function Home() {
 
           {/* SELETOR DE CLIENTE + API */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Provider Switcher */}
+            {/* Provider Switcher - apenas 2 opcoes */}
             <div className="inline-flex items-center bg-white/5 border border-white/10 rounded-xl p-1">
               <button
                 onClick={() => setProvider('Opus 4.8')}
@@ -511,7 +511,7 @@ export default function Home() {
                   provider === 'Opus 4.8' ? 'bg-emerald-500/20 text-emerald-300 shadow' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Opus 4.8
+                Opus 4.8 Studio
               </button>
               <button
                 onClick={() => setProvider('openai')}
