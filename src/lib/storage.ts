@@ -223,7 +223,7 @@ export async function getStorageStats(): Promise<{
       // ignora, usa valor padrao
     }
     const remainingMB = Math.max(0, estimatedLimitMB - totalBytes / (1024 * 1024));
-    const usedPercent = estimatedLimitMB > 0 ? Math.min(100, Math.round((totalBytes / (1024 * 1024) / estimatedLimitMB * 100)) : 0;
+    const usedPercent = estimatedLimitMB > 0 ? Math.min(100, Math.round((totalBytes / (1024 * 1024) / estimatedLimitMB * 100))) : 0;
     return {
       fontCount: fonts.length,
       totalBytes,
