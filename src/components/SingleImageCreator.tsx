@@ -41,6 +41,7 @@ import {
 import { FreeCanvasEditor, CanvasLayer } from '@/components/FreeCanvasEditor';
 import { SmartTemplates, SmartTemplate, AVAILABLE_TEMPLATES } from '@/components/SmartTemplates';
 import { usePersistedState } from '@/lib/usePersistedState';
+import { BackgroundImageControl, buildBackgroundImageStyle } from '@/components/BackgroundImageControl';
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -76,6 +77,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Background (PERSISTIDO)
   const [bgPrompt, setBgPrompt] = usePersistedState<string>('single_bg_prompt', '');
   const [bgImage, setBgImage] = usePersistedState<string | null>('single_bg_image', null);
+  // Controle de zoom e posicao do background
+  const [bgScale, setBgScale] = usePersistedState<number>('single_bg_scale', 100);
+  const [bgOffsetX, setBgOffsetX] = usePersistedState<number>('single_bg_x', 0);
+  const [bgOffsetY, setBgOffsetY] = usePersistedState<number>('single_bg_y', 0);
   const [isGeneratingBg, setIsGeneratingBg] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
@@ -792,7 +797,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 <img
                   src={bgImage}
                   alt="Background"
-                  className="absolute inset-0 w-full h-full object-cover"
+                  draggable={false}
+                  style={buildBackgroundImageStyle({ scale: bgScale, offsetX: bgOffsetX, offsetY: bgOffsetY })}
                 />
               ) : (
                 <div
@@ -1690,6 +1696,20 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </button>
               )}
             </div>
+
+            {/* CONTROLE DE ZOOM E POSICAO DA IMAGEM DE FUNDO */}
+            {bgImage && (
+              <BackgroundImageControl
+                scale={bgScale}
+                offsetX={bgOffsetX}
+                offsetY={bgOffsetY}
+                onChange={({ scale, offsetX, offsetY }) => {
+                  setBgScale(scale);
+                  setBgOffsetX(offsetX);
+                  setBgOffsetY(offsetY);
+                }}
+              />
+            )}
 
             <div className="space-y-2">
               {/* MESTRE DOS PROMPTS - Genos-style */}
