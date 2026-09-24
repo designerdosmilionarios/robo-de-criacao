@@ -14,6 +14,7 @@ import { PoseStudio } from '@/components/PoseStudio';
 import { FontManager, LocalFont as FontManagerLocalFont } from '@/components/FontManager';
 import { MyProjects } from '@/components/MyProjects';
 import { SaveProjectModal } from '@/components/SaveProjectModal';
+import { FlowCanvas } from '@/components/FlowCanvas';
 import { useProjects } from '@/lib/useProjects';
 import { useLocalFonts } from '@/lib/useLocalFonts';
 import {
@@ -33,13 +34,14 @@ import {
   FolderOpen,
   Save,
   CheckCircle2,
+  GitBranch,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import saveAs from 'file-saver';
 
 type AIProvider = 'openai';
-type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects';
+type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects' | 'flow';
 
 export default function Home() {
   const [brands, setBrands] = useState<BrandKit[]>(DEFAULT_BRANDS);
@@ -467,6 +469,14 @@ export default function Home() {
               <FolderOpen size={13} /> Meus Projetos ({savedProjects.length})
             </button>
             <button
+              onClick={() => setActiveTab('flow')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'flow' ? 'bg-brand-500 text-dark-900 shadow-md' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <GitBranch size={13} /> Fluxos (Gravyx)
+            </button>
+            <button
               onClick={() => setActiveTab('fonts')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'fonts' ? 'bg-brand-500 text-dark-900 shadow-md' : 'text-gray-400 hover:text-white'
@@ -689,6 +699,31 @@ export default function Home() {
             onDuplicateProject={duplicateProject}
             onImportProjects={importProjects}
           />
+        )}
+
+        {activeTab === 'flow' && (
+          <div className="space-y-4">
+            <div className="p-5 rounded-3xl bg-gradient-to-br from-brand-500/10 via-purple-500/5 to-transparent border border-brand-500/20">
+              <h2 className="text-xl font-extrabold text-white mb-2 flex items-center gap-2">
+                <GitBranch size={20} className="text-brand-400" />
+                Canvas de Fluxos (estilo Gravyx)
+              </h2>
+              <p className="text-sm text-gray-400 max-w-3xl">
+                Crie criativos encadeando blocos visuais. Adicione um <strong className="text-blue-400">Briefing</strong> com o produto/dor do cliente, conecte com um <strong className="text-amber-400">Gerar Copy</strong> ou <strong className="text-emerald-400">Gerar Imagem</strong>, e clique em <strong>▶</strong> para executar o fluxo.
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                💡 <strong>Dica:</strong> arraste os blocos pela tela para organizar. Clique na bolinha colorida à direita de um bloco e depois no ponto verde à esquerda de outro para conectar.
+              </p>
+            </div>
+            <FlowCanvas
+              apiKey={apiKey}
+              provider={provider}
+              brand={{
+                name: activeBrand.name,
+                primaryColor: activeBrand.primaryColor,
+              }}
+            />
+          </div>
         )}
 
         {activeTab === 'fonts' && (
