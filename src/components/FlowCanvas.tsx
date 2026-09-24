@@ -252,7 +252,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       {/* BARRA DE FERRAMENTAS (topo) */}
       <div className="flex items-center gap-2 p-3 border-b border-white/10 bg-[#0d0f17] flex-wrap">
         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider pr-2">
-          🎨 Canvas de Fluxos (estilo Gravyx)
+          🎨 Esteira IA — Conecte blocos para criar criativos
         </span>
         <div className="flex items-center gap-1.5 flex-wrap">
           <button

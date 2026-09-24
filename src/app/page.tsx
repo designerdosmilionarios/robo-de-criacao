@@ -474,7 +474,7 @@ export default function Home() {
                 activeTab === 'flow' ? 'bg-brand-500 text-dark-900 shadow-md' : 'text-gray-400 hover:text-white'
               }`}
             >
-              <GitBranch size={13} /> Fluxos (Gravyx)
+              <GitBranch size={13} /> Esteira IA
             </button>
             <button
               onClick={() => setActiveTab('fonts')}
@@ -706,13 +706,13 @@ export default function Home() {
             <div className="p-5 rounded-3xl bg-gradient-to-br from-brand-500/10 via-purple-500/5 to-transparent border border-brand-500/20">
               <h2 className="text-xl font-extrabold text-white mb-2 flex items-center gap-2">
                 <GitBranch size={20} className="text-brand-400" />
-                Canvas de Fluxos (estilo Gravyx)
+                Esteira IA — Estúdio de Produção com IA
               </h2>
               <p className="text-sm text-gray-400 max-w-3xl">
-                Crie criativos encadeando blocos visuais. Adicione um <strong className="text-blue-400">Briefing</strong> com o produto/dor do cliente, conecte com um <strong className="text-amber-400">Gerar Copy</strong> ou <strong className="text-emerald-400">Gerar Imagem</strong>, e clique em <strong>▶</strong> para executar o fluxo.
+                Monte a sua linha de produção visual com blocos conectados. Comece com um <strong className="text-blue-400">Briefing</strong> descrevendo o produto e a dor, adicione <strong className="text-pink-400">Estilo</strong> e <strong className="text-purple-400">Logo</strong> como referência, e dispare <strong className="text-amber-400">Copy</strong> + <strong className="text-emerald-400">Imagem</strong> encadeados. Clique no <strong>▶</strong> de cada bloco para executar e ver o resultado aparecer na tela.
               </p>
               <p className="text-xs text-gray-500 mt-2">
-                💡 <strong>Dica:</strong> arraste os blocos pela tela para organizar. Clique na bolinha colorida à direita de um bloco e depois no ponto verde à esquerda de outro para conectar.
+                💡 <strong>Como conectar:</strong> arraste os blocos para organizar. Clique na bolinha colorida à direita do bloco de origem e depois no ponto verde à esquerda do bloco de destino. As linhas verdes pontilhadas mostram o fluxo dos dados.
               </p>
             </div>
             <FlowCanvas
