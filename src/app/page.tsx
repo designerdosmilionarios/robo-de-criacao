@@ -15,6 +15,7 @@ import { FontManager, LocalFont as FontManagerLocalFont } from '@/components/Fon
 import { MyProjects } from '@/components/MyProjects';
 import { SaveProjectModal } from '@/components/SaveProjectModal';
 import { useProjects } from '@/lib/useProjects';
+import { useLocalFonts } from '@/lib/useLocalFonts';
 import {
   Sparkles,
   Palette,
@@ -56,8 +57,14 @@ export default function Home() {
   const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
   const [provider, setProvider] = useState<AIProvider>('openai');
 
-  // Fontes locais
-  const [localFonts, setLocalFonts] = useState<LocalFont[]>([]);
+  // Fontes locais (migrado para IndexedDB para suportar GBs ao invés de 5MB)
+  const {
+    fonts: localFonts,
+    addFont: addLocalFont,
+    removeFont: removeLocalFont,
+    clearAllFonts,
+    storageStats: fontStorageStats,
+  } = useLocalFonts();
 
   // Abas principais
   const [activeTab, setActiveTab] = useState<ActiveTab>('single-image');
@@ -91,13 +98,7 @@ export default function Home() {
     setOpenaiApiKey(localStorage.getItem('openai_api_key') || '');
     // Limpar chave antiga do Google/Claude se existir (não usa mais)
     localStorage.removeItem('claude_api_key');
-
-    try {
-      const savedFonts = localStorage.getItem('local_fonts');
-      if (savedFonts) setLocalFonts(JSON.parse(savedFonts));
-    } catch (e) {
-      console.error('Erro ao carregar fontes salvas:', e);
-    }
+    // As fontes agora sao gerenciadas pelo hook useLocalFonts (IndexedDB)
   }, []);
 
   // Salvar preferências sempre que mudarem
@@ -215,28 +216,21 @@ export default function Home() {
     }
   };
 
-  // Gerenciamento de Fontes
-  const handleAddLocalFont = (font: FontManagerLocalFont) => {
-    setLocalFonts((prev) => {
-      const filtered = prev.filter(
-        (f) => !(f.family === font.family && f.weight === font.weight && f.italic === font.italic)
-      );
-      const next = [...filtered, font];
-      try {
-        localStorage.setItem('local_fonts', JSON.stringify(next));
-      } catch (e) {
-        alert('Limite de armazenamento atingido. Remova algumas fontes para liberar espaço.');
-      }
-      return next;
-    });
+  // Gerenciamento de Fontes (usando IndexedDB atraves do hook useLocalFonts)
+  const handleAddLocalFont = async (font: FontManagerLocalFont) => {
+    try {
+      await addLocalFont(font);
+    } catch (err: any) {
+      alert(err.message || 'Erro ao adicionar fonte.');
+    }
   };
 
-  const handleRemoveLocalFont = (family: string) => {
-    setLocalFonts((prev) => {
-      const next = prev.filter((f) => f.family !== family);
-      localStorage.setItem('local_fonts', JSON.stringify(next));
-      return next;
-    });
+  const handleRemoveLocalFont = async (family: string) => {
+    try {
+      await removeLocalFont(family);
+    } catch (err: any) {
+      console.error('Erro ao remover fonte:', err);
+    }
   };
 
   // =========================================
