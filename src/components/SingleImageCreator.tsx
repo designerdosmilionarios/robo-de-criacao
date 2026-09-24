@@ -38,6 +38,7 @@ import {
   buildContainerStyle,
 } from '@/components/TypographyControl';
 import { FreeCanvasEditor, CanvasLayer } from '@/components/FreeCanvasEditor';
+import { SmartTemplates, SmartTemplate, AVAILABLE_TEMPLATES } from '@/components/SmartTemplates';
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -669,7 +670,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               editMode === 'free' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
             }`}
           >
-            ✏️ Editor Livre
+            🤖 Templates IA
           </button>
         </div>
 
@@ -698,14 +699,65 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         <div className="xl:col-span-8 flex flex-col items-center">
           <div className="w-full max-w-[680px]">
             {editMode === 'free' ? (
-              // MODO LIVRE: Editor com posicionamento livre de camadas
-              <FreeCanvasEditor
-                initialLayers={freeLayers}
-                backgroundImage={bgImage}
-                canvasAspectRatio={format.replace(':', '/')}
-                onChange={setFreeLayers}
-                localFonts={localFonts}
-                defaultFontFamily={brand.fontHeadline}
+              // MODO TEMPLATES: Sistema de templates automaticos com IA
+              <SmartTemplates
+                onApplyTemplate={(template, config) => {
+                  // Aplica a config do template no canvas
+                  setTag(config.texts.tag);
+                  setHeadline(config.texts.headline);
+                  setHighlightText(config.texts.highlight);
+                  setSubline(config.texts.subline);
+                  setCtaText(config.texts.cta);
+                  // Aplica tipografia
+                  setHeadlineConfig({
+                    ...DEFAULT_TYPOGRAPHY,
+                    fontFamily: brand.fontHeadline,
+                    fontSize: config.typography.headlineSize,
+                    fontWeight: config.typography.headlineWeight,
+                    color: brand.textColor,
+                    textAlign: config.layout.headlinePosition.align,
+                  });
+                  setTagConfig({
+                    ...DEFAULT_TYPOGRAPHY,
+                    fontFamily: brand.fontHeadline,
+                    fontSize: config.typography.tagSize,
+                    fontWeight: config.typography.tagWeight,
+                    color: brand.primaryColor,
+                    useUppercase: config.typography.tagCaps,
+                    textAlign: config.layout.tagPosition.align,
+                  });
+                  setHighlightConfig({
+                    ...DEFAULT_TYPOGRAPHY,
+                    fontFamily: brand.fontHeadline,
+                    fontSize: config.typography.highlightSize,
+                    fontWeight: '700',
+                    color: brand.primaryColor,
+                    textAlign: config.layout.highlightPosition.align,
+                  });
+                  setSublineConfig({
+                    ...DEFAULT_TYPOGRAPHY,
+                    fontFamily: brand.fontBody,
+                    fontSize: config.typography.sublineSize,
+                    fontWeight: '400',
+                    color: brand.accentTextColor,
+                    textAlign: config.layout.sublinePosition.align,
+                  });
+                  setCtaConfig({
+                    ...DEFAULT_TYPOGRAPHY,
+                    fontFamily: brand.fontHeadline,
+                    fontSize: config.typography.ctaSize,
+                    fontWeight: config.typography.ctaWeight,
+                    color: brand.backgroundColor,
+                    useUppercase: config.typography.ctaCaps,
+                    textAlign: config.layout.ctaPosition.align,
+                  });
+                  // Aplica background
+                  setUseGradient(config.visual.useGradientBg);
+                  setGradientColor1(config.visual.gradientColor1);
+                  setGradientColor2(config.visual.gradientColor2);
+                  setGradientAngle(config.visual.gradientAngle);
+                  setGlowIntensity(config.visual.glowIntensity);
+                }}
               />
             ) : (
               // MODO AUTO: Layout pre-definido (canvas atual)
