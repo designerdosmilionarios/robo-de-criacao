@@ -40,6 +40,7 @@ import {
 } from '@/components/TypographyControl';
 import { FreeCanvasEditor, CanvasLayer } from '@/components/FreeCanvasEditor';
 import { SmartTemplates, SmartTemplate, AVAILABLE_TEMPLATES } from '@/components/SmartTemplates';
+import { usePersistedState } from '@/lib/usePersistedState';
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -69,23 +70,23 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const logoFileInputRef = useRef<HTMLInputElement>(null);
   const refFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Formato do Canvas
-  const [format, setFormat] = useState<'4:5' | '1:1' | '9:16' | '16:9'>('4:5');
+  // Formato do Canvas (PERSISTIDO)
+  const [format, setFormat] = usePersistedState<'4:5' | '1:1' | '9:16' | '16:9'>('single_format', '4:5');
 
-  // Background (IA ou Upload)
-  const [bgPrompt, setBgPrompt] = useState('');
-  const [bgImage, setBgImage] = useState<string | null>(null);
+  // Background (PERSISTIDO)
+  const [bgPrompt, setBgPrompt] = usePersistedState<string>('single_bg_prompt', '');
+  const [bgImage, setBgImage] = usePersistedState<string | null>('single_bg_image', null);
   const [isGeneratingBg, setIsGeneratingBg] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
-  const [selectedModel, setSelectedModel] = useState<string>('auto');
+  const [selectedModel, setSelectedModel] = usePersistedState<string>('single_model', 'auto');
 
-  // Degradê customizado do background (cor sólida quando bgImage é null)
-  const [useGradient, setUseGradient] = useState(true);
-  const [gradientColor1, setGradientColor1] = useState('#0a1f1a');
-  const [gradientColor2, setGradientColor2] = useState('#0a0b10');
-  const [gradientAngle, setGradientAngle] = useState(135);
-  const [gradientOpacity, setGradientOpacity] = useState(100);
+  // Degradê customizado (PERSISTIDO)
+  const [useGradient, setUseGradient] = usePersistedState<boolean>('single_use_gradient', true);
+  const [gradientColor1, setGradientColor1] = usePersistedState<string>('single_grad_c1', '#0a1f1a');
+  const [gradientColor2, setGradientColor2] = usePersistedState<string>('single_grad_c2', '#0a0b10');
+  const [gradientAngle, setGradientAngle] = usePersistedState<number>('single_grad_angle', 135);
+  const [gradientOpacity, setGradientOpacity] = usePersistedState<number>('single_grad_opacity', 100);
 
   // Glows de marca (esferas coloridas desfocadas no fundo)
   const [showBrandGlows, setShowBrandGlows] = useState(true);
@@ -119,21 +120,21 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Imagem de Referência para a IA guiar o estilo
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
-  // Logo da Marca
-  const [logoImage, setLogoImage] = useState<string | null>(brand.logoUrl || null);
-  const [logoPosition, setLogoPosition] = useState<
+  // Logo da Marca (PERSISTIDO)
+  const [logoImage, setLogoImage] = usePersistedState<string | null>('single_logo_image', brand.logoUrl || null);
+  const [logoPosition, setLogoPosition] = usePersistedState<
     'top-left' | 'top-center' | 'top-right' |
     'middle-left' | 'middle-center' | 'middle-right' |
     'bottom-left' | 'bottom-center' | 'bottom-right'
-  >('top-left');
-  const [logoScale, setLogoScale] = useState<number>(100);
+  >('single_logo_pos', 'top-left');
+  const [logoScale, setLogoScale] = usePersistedState<number>('single_logo_scale', 100);
 
-  // Imagem de Pessoa Real
-  const [personImage, setPersonImage] = useState<string | null>(null);
-  const [personPosition, setPersonPosition] = useState<'right' | 'left' | 'center'>('right');
-  const [personScale, setPersonScale] = useState<number>(100); // 50% a 150%
-  const [personBottomOffset, setPersonBottomOffset] = useState<number>(0);
-  const [personFlipped, setPersonFlipped] = useState(false);
+  // Imagem de Pessoa Real (PERSISTIDO)
+  const [personImage, setPersonImage] = usePersistedState<string | null>('single_person_image', null);
+  const [personPosition, setPersonPosition] = usePersistedState<'right' | 'left' | 'center'>('single_person_pos', 'right');
+  const [personScale, setPersonScale] = usePersistedState<number>('single_person_scale', 100);
+  const [personBottomOffset, setPersonBottomOffset] = usePersistedState<number>('single_person_offset', 0);
+  const [personFlipped, setPersonFlipped] = usePersistedState<boolean>('single_person_flipped', false);
   const [personShadow, setPersonShadow] = useState(true);
   const [personGlow, setPersonGlow] = useState(false);
   const [personBottomFade, setPersonBottomFade] = useState(true);
@@ -153,16 +154,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     if (brand.handle && !showHandle) setCustomTopText('');
   }, [brand.handle, showHandle]);
 
-  // Camadas de Texto
-  const [showText, setShowText] = useState(true);
-  const [tag, setTag] = useState('MÉTODO EXCLUSIVO');
-  const [headline, setHeadline] = useState('COMO DOBRAR SUAS CONVERSÕES NO META ADS');
-  const [highlightText, setHighlightText] = useState('Sem gastar mais em tráfego');
-  const [subline, setSubline] = useState('Aprenda o passo a passo validado por especialistas.');
-  const [ctaText, setCtaText] = useState('QUERO APRENDER AGORA');
-  const [showCta, setShowCta] = useState(true);
+  // Camadas de Texto (PERSISTIDAS)
+  const [showText, setShowText] = usePersistedState<boolean>('single_show_text', true);
+  const [tag, setTag] = usePersistedState<string>('single_tag', 'MÉTODO EXCLUSIVO');
+  const [headline, setHeadline] = usePersistedState<string>('single_headline', 'COMO DOBRAR SUAS CONVERSÕES NO META ADS');
+  const [highlightText, setHighlightText] = usePersistedState<string>('single_highlight', 'Sem gastar mais em tráfego');
+  const [subline, setSubline] = usePersistedState<string>('single_subline', 'Aprenda o passo a passo validado por especialistas.');
+  const [ctaText, setCtaText] = usePersistedState<string>('single_cta_text', 'QUERO APRENDER AGORA');
+  const [showCta, setShowCta] = usePersistedState<boolean>('single_show_cta', true);
   const [headlineFont, setHeadlineFont] = useState(brand.fontHeadline);
-  const [textAlignment, setTextAlignment] = useState<'left' | 'center'>('left');
+  const [textAlignment, setTextAlignment] = usePersistedState<'left' | 'center'>('single_text_align', 'left');
 
   // CONFIGURACOES TIPOGRAFICAS AVANCADAS (um TypographyConfig por texto)
   const [tagConfig, setTagConfig] = useState<TypographyConfig>({

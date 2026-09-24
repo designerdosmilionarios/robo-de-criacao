@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { usePersistedState } from '@/lib/usePersistedState';
 import { BrandKit, LocalFont } from '@/types';
 import {
   User,
@@ -102,14 +103,17 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
   onSaveRequest,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [faceImage, setFaceImage] = useState<string | null>(null);
-  const [selectedPose, setSelectedPose] = useState(PRESET_POSES[0].id);
-  const [selectedAttire, setSelectedAttire] = useState(ATTIRE_OPTIONS[0].id);
-  const [selectedBg, setSelectedBg] = useState(BACKGROUND_OPTIONS[0].id);
-  const [customDetails, setCustomDetails] = useState('');
+  // Estados persistidos (sobrevive a mudanca de aba)
+  const [faceImage, setFaceImage] = usePersistedState<string | null>('pose_face_image', null);
+  const [selectedPose, setSelectedPose] = usePersistedState<string>('pose_selected', PRESET_POSES[0].id);
+  const [selectedAttire, setSelectedAttire] = usePersistedState<string>('pose_attire', ATTIRE_OPTIONS[0].id);
+  const [selectedBg, setSelectedBg] = usePersistedState<string>('pose_bg', BACKGROUND_OPTIONS[0].id);
+  const [customDetails, setCustomDetails] = usePersistedState<string>('pose_details', '');
+  const [generatedPoses, setGeneratedPoses] = usePersistedState<string[]>('pose_generated', []);
+
+  // Estados nao persistidos (resetam a cada sessao)
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedPoses, setGeneratedPoses] = useState<string[]>([]);
 
   // Registrar estado + função de load para o componente pai poder salvar/carregar projetos
   useEffect(() => {
@@ -202,7 +206,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao gerar nova pose.');
 
-      setGeneratedPoses((prev) => [data.imageUrl, ...prev]);
+      setGeneratedPoses((prev: string[]) => [data.imageUrl, ...prev]);
     } catch (err: any) {
       setError(err.message || 'Erro ao comunicar com a IA.');
     } finally {
