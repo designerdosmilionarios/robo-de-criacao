@@ -39,11 +39,16 @@ async function tryGoogleGemini(key: string, prompt: string, aspectRatio: string)
 
   // Lista de modelos Opus 4.8 com capacidade de geração de imagem
   // "Nano Banana Pro" = gemini-3-pro-image-preview (mais novo, melhor qualidade)
+  // "Nano Banana 2" = gemini-3.1-flash-image-preview (ainda mais novo)
+  // Tentamos do melhor/mais novo para o mais antigo
   const modelCandidates = [
-    'gemini-3-pro-image-preview',
-    'gemini-2.5-flash-image',
-    'gemini-2.0-flash-exp-image',
-    'gemini-2.5-flash-image-preview',
+    'gemini-3.1-flash-image',           // Nano Banana 2 (mais novo)
+    'gemini-3.1-flash-image-preview',   // Nano Banana 2 Preview
+    'gemini-3-pro-image',               // Nano Banana Pro (estável)
+    'gemini-3-pro-image-preview',       // Nano Banana Pro Preview
+    'nano-banana-pro-preview',          // Alias
+    'gemini-2.5-flash-image',           // Nano Banana (v1)
+    'gemini-2.0-flash-exp-image',       // Fallback
   ];
 
   const errors: string[] = [];
@@ -115,10 +120,10 @@ function enhancePromptForAd(rawPrompt: string): string {
 
   return [
     core,
-    'A single cohesive cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, shot on Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
-    'IMPORTANT: Generate ONE single unified image, NOT a side-by-side comparison, NOT before/after, NOT split screen, NOT multiple panels. The entire frame must be a single continuous scene with one consistent lighting and composition.',
-    'Avoid: text, words, letters, numbers, watermarks, signatures, logos, ugly artifacts, plastic skin, oversaturated colors, low resolution, blurry, distorted anatomy, extra fingers, deformed hands, multiple viewpoints',
-    'Composition should leave clean space on the right or left side for text overlay to be added later',
+    'Single unified cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, shot on Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
+    'IMPORTANT: Generate ONE single unified image. NOT a side-by-side comparison. NOT before/after. NOT split screen. NOT multiple panels. The entire frame must be one continuous scene with consistent lighting and composition.',
+    'Avoid in the image: text, words, letters, numbers, watermarks, signatures, logos, ugly artifacts, plastic skin, oversaturated colors, low resolution, blurry, distorted anatomy, extra fingers, deformed hands, multiple viewpoints',
+    'Composition: leave clean empty space on the right or left side of the frame for text overlay to be added later',
   ].filter(Boolean).join('. ');
 }
 
