@@ -24,6 +24,7 @@ import {
   Trash2,
   Image as ImgIcon,
   Save,
+  RefreshCw,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
@@ -78,6 +79,21 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Glows de marca (esferas coloridas desfocadas no fundo)
   const [showBrandGlows, setShowBrandGlows] = useState(true);
   const [glowIntensity, setGlowIntensity] = useState(35);
+
+  // MODO VARIAÇÕES EM MASSA
+  const [variationsCount, setVariationsCount] = useState<number>(4);
+  const [bulkVariations, setBulkVariations] = useState<string[]>([]);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+
+  // MODO REFINAMENTO ITERATIVO
+  const [refinementInstruction, setRefinementInstruction] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
+  const [refinementHistory, setRefinementHistory] = useState<Array<{ instruction: string; result: string }>>([]);
+
+  // MESTRE DOS PROMPTS (Genos-style)
+  const [masterPromptInput, setMasterPromptInput] = useState('');
+  const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
+  const [masterPromptLog, setMasterPromptLog] = useState<string[]>([]);
 
   // Imagem de Referência para a IA guiar o estilo
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -365,6 +381,161 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       setBgError(err.message || 'Erro ao comunicar com a IA.');
     } finally {
       setIsGeneratingBg(false);
+    }
+  };
+
+  // VARIAÇÕES EM MASSA - gera N imagens com o mesmo prompt
+  const handleBulkGenerate = async () => {
+    if (!apiKey) {
+      setBgError('Configure sua chave de API antes.');
+      return;
+    }
+    if (!bgPrompt && !referenceImage) {
+      setBgError('Digite um prompt antes de gerar variações.');
+      return;
+    }
+    setIsBulkGenerating(true);
+    setBulkVariations([]);
+    setBgError(null);
+
+    const sizeMap: any = {
+      '16:9': '1920x1080',
+      '9:16': '1080x1920',
+      '4:5': '1080x1350',
+      '1:1': '1024x1024',
+    };
+
+    const variations: string[] = [];
+    for (let i = 0; i < variationsCount; i++) {
+      try {
+        const res = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: bgPrompt || 'premium dark cinematic background for advertising',
+            size: sizeMap[format],
+            aspectRatio: format,
+            preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
+            apiKey,
+            ...(referenceImage ? { imageBase64: referenceImage.replace(/^data:image\/\w+;base64,/, '') } : {}),
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.imageUrl) {
+          variations.push(data.imageUrl);
+          setBulkVariations([...variations]);
+        }
+      } catch (err) {
+        console.error('Erro na variação', i, err);
+      }
+    }
+
+    // Adiciona todas à galeria principal também
+    if (variations.length > 0) {
+      setGeneratedGallery((prev) => [...variations, ...prev]);
+      // Usa a primeira como background atual
+      setBgImage(variations[0]);
+    }
+
+    setIsBulkGenerating(false);
+  };
+
+  // REFINAMENTO ITERATIVO - pega imagem atual e refina com instrução
+  const handleRefine = async () => {
+    if (!apiKey) {
+      setBgError('Configure sua chave de API antes.');
+      return;
+    }
+    if (!bgImage) {
+      setBgError('Gere uma imagem primeiro para refinar.');
+      return;
+    }
+    if (!refinementInstruction.trim()) {
+      setBgError('Digite uma instrução de refinamento (ex: "mude a iluminação para azul neon").');
+      return;
+    }
+
+    setIsRefining(true);
+    setBgError(null);
+
+    const sizeMap: any = {
+      '16:9': '1920x1080',
+      '9:16': '1080x1920',
+      '4:5': '1080x1350',
+      '1:1': '1024x1024',
+    };
+
+    // Pega base64 da imagem atual (sem o prefixo data:image/...)
+    const base64Image = bgImage.replace(/^data:image\/\w+;base64,/, '');
+
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `${refinementInstruction}. Maintain the composition and style of the reference image but apply this change.`,
+          size: sizeMap[format],
+          aspectRatio: format,
+          preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
+          apiKey,
+          imageBase64: base64Image,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao refinar.');
+
+      // Adiciona ao histórico e aplica
+      setRefinementHistory((prev) => [
+        { instruction: refinementInstruction, result: data.imageUrl },
+        ...prev,
+      ]);
+      setBgImage(data.imageUrl);
+      setGeneratedGallery((prev) => [data.imageUrl, ...prev]);
+      setRefinementInstruction('');
+    } catch (err: any) {
+      setBgError(err.message || 'Erro ao refinar.');
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  // MESTRE DOS PROMPTS - chama o endpoint que usa OpenAI Chat para otimizar
+  const handleMasterPrompt = async () => {
+    if (!apiKey) {
+      setBgError('Configure sua chave de API antes.');
+      return;
+    }
+    if (!masterPromptInput.trim()) {
+      setBgError('Digite um brief ou prompt para o Mestre otimizar.');
+      return;
+    }
+
+    setIsOptimizingPrompt(true);
+    setBgError(null);
+
+    try {
+      const res = await fetch('/api/master-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brief: masterPromptInput,
+          apiKey,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro no Mestre dos Prompts.');
+
+      // Substitui o prompt do usuário pelo otimizado
+      setBgPrompt(data.prompt);
+      setMasterPromptLog((prev) => [
+        `📝 Brief: ${masterPromptInput}\n✨ Prompt otimizado: ${data.prompt}`,
+        ...prev,
+      ].slice(0, 5));
+      setMasterPromptInput('');
+    } catch (err: any) {
+      setBgError(err.message || 'Erro no Mestre dos Prompts.');
+    } finally {
+      setIsOptimizingPrompt(false);
     }
   };
 
@@ -1119,6 +1290,37 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             </div>
 
             <div className="space-y-2">
+              {/* MESTRE DOS PROMPTS - Genos-style */}
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/10 to-blue-500/5 border border-purple-500/30 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Wand2 size={13} className="text-purple-400" />
+                  <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider">Mestre dos Prompts</span>
+                  <span className="text-[9px] font-mono text-purple-400 ml-auto">powered by ChatGPT</span>
+                </div>
+                <textarea
+                  rows={2}
+                  value={masterPromptInput}
+                  onChange={(e) => setMasterPromptInput(e.target.value)}
+                  placeholder="Brief curto: ex: 'smartphone premium em fundo escuro com luzes neon'"
+                  className="w-full px-3 py-2 rounded-xl bg-black/30 border border-purple-500/20 text-white placeholder-gray-500 text-xs focus:border-purple-500 focus:outline-none resize-none"
+                />
+                <button
+                  onClick={handleMasterPrompt}
+                  disabled={isOptimizingPrompt}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/30 hover:bg-purple-500/40 text-purple-100 border border-purple-500/40 transition-all disabled:opacity-50"
+                >
+                  {isOptimizingPrompt ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" /> Otimizando prompt...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={12} /> Transformar em prompt profissional
+                    </>
+                  )}
+                </button>
+              </div>
+
               <textarea
                 rows={2}
                 value={bgPrompt}
@@ -1206,6 +1408,105 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </button>
               </div>
               {bgError && <p className="text-[11px] text-red-400">{bgError}</p>}
+
+              {/* VARIAÇÕES EM MASSA */}
+              <div className="pt-3 border-t border-white/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers size={11} className="text-blue-400" /> Variações em Massa
+                  </span>
+                  <select
+                    value={variationsCount}
+                    onChange={(e) => setVariationsCount(Number(e.target.value))}
+                    className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-white text-[10px] font-semibold focus:outline-none"
+                  >
+                    <option value={2} className="bg-[#11131a]">2 variações</option>
+                    <option value={4} className="bg-[#11131a]">4 variações</option>
+                    <option value={6} className="bg-[#11131a]">6 variações</option>
+                    <option value={8} className="bg-[#11131a]">8 variações</option>
+                  </select>
+                </div>
+                <button
+                  onClick={handleBulkGenerate}
+                  disabled={isBulkGenerating}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 transition-all disabled:opacity-50"
+                >
+                  {isBulkGenerating ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" /> Gerando {bulkVariations.length}/{variationsCount}...
+                    </>
+                  ) : (
+                    <>
+                      <Layers size={12} /> Gerar {variationsCount} Variações
+                    </>
+                  )}
+                </button>
+                {bulkVariations.length > 0 && (
+                  <div className="grid grid-cols-2 gap-1.5 mt-2">
+                    {bulkVariations.map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setBgImage(img)}
+                        className="relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-brand-500 transition-colors"
+                        title={`Aplicar variação ${i + 1}`}
+                      >
+                        <img src={img} alt={`variação ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* REFINAMENTO ITERATIVO */}
+              {bgImage && (
+                <div className="pt-3 border-t border-white/5 space-y-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <RefreshCw size={11} className="text-amber-400" /> Refinar esta Imagem
+                  </span>
+                  <input
+                    type="text"
+                    value={refinementInstruction}
+                    onChange={(e) => setRefinementInstruction(e.target.value)}
+                    placeholder="Ex: 'mude iluminação para azul neon' ou 'adicione pessoa no canto'"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 text-xs focus:border-brand-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleRefine}
+                    disabled={isRefining}
+                    className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-all disabled:opacity-50"
+                  >
+                    {isRefining ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" /> Refinando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={12} /> Refinar Imagem
+                      </>
+                    )}
+                  </button>
+                  {refinementHistory.length > 0 && (
+                    <div className="space-y-1.5 mt-2">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">Histórico</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {refinementHistory.map((h, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setBgImage(h.result)}
+                            className="relative aspect-square rounded-lg overflow-hidden border border-white/10 hover:border-amber-500 transition-colors group"
+                            title={h.instruction}
+                          >
+                            <img src={h.result} alt={`refinamento ${i + 1}`} className="w-full h-full object-cover" />
+                            <span className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1">
+                              <span className="text-[9px] text-white text-center line-clamp-3">{h.instruction}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
