@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_BRANDS, INITIAL_CAROUSEL } from '@/lib/constants';
-import { BrandKit, CarouselProject, CarouselSlide, LocalFont } from '@/types';
+import { BrandKit, CarouselProject, CarouselSlide, LocalFont, SavedProject } from '@/types';
 import { SlideCanvas } from '@/components/SlideCanvas';
 import { SlideEditor } from '@/components/SlideEditor';
 import { BrandKitModal } from '@/components/BrandKitModal';
@@ -12,6 +12,9 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { SingleImageCreator } from '@/components/SingleImageCreator';
 import { PoseStudio } from '@/components/PoseStudio';
 import { FontManager, LocalFont as FontManagerLocalFont } from '@/components/FontManager';
+import { MyProjects } from '@/components/MyProjects';
+import { SaveProjectModal } from '@/components/SaveProjectModal';
+import { useProjects } from '@/lib/useProjects';
 import {
   Sparkles,
   Palette,
@@ -26,12 +29,16 @@ import {
   Type,
   ImageIcon,
   User,
+  FolderOpen,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import saveAs from 'file-saver';
 
 type AIProvider = 'openai' | 'Opus 4.8';
+type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects';
 
 export default function Home() {
   const [brands, setBrands] = useState<BrandKit[]>(DEFAULT_BRANDS);
@@ -54,9 +61,27 @@ export default function Home() {
   const [localFonts, setLocalFonts] = useState<LocalFont[]>([]);
 
   // Abas principais
-  const [activeTab, setActiveTab] = useState<'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts'>('single-image');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('single-image');
   const [personImageForCreative, setPersonImageForCreative] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Sistema de projetos salvos
+  const {
+    projects: savedProjects,
+    saveProject,
+    deleteProject,
+    duplicateProject,
+    importProjects,
+  } = useProjects();
+
+  // Modal de salvar projeto
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveModalType, setSaveModalType] = useState<'carousel' | 'single-image' | 'pose' | 'batch-ads'>('carousel');
+  const [saveModalDefaultName, setSaveModalDefaultName] = useState('');
+  const [saveModalExistingId, setSaveModalExistingId] = useState<string | undefined>(undefined);
+
+  // Notificação rápida após salvar
+  const [lastSavedName, setLastSavedName] = useState<string | null>(null);
 
   // Cliente atual
   const activeBrand = brands.find((b) => b.id === activeBrandId) || brands[0];
@@ -216,6 +241,170 @@ export default function Home() {
     });
   };
 
+  // =========================================
+  // SISTEMA DE SALVAR/CARREGAR PROJETOS
+  // =========================================
+
+  // Handlers unificados para abrir o modal de salvar projeto a partir de cada aba
+  const openSaveProjectModal = useCallback(
+    (type: 'carousel' | 'single-image' | 'pose' | 'batch-ads', defaultName: string) => {
+      setSaveModalType(type);
+      setSaveModalDefaultName(defaultName);
+      setSaveModalExistingId(undefined);
+      setSaveModalOpen(true);
+    },
+    []
+  );
+
+  // Salvar projeto de CARROSSEL
+  const handleSaveCarouselProject = useCallback(
+    (name: string) => {
+      // Gera thumbnail do primeiro slide
+      const firstSlide = project.slides[0];
+      const el = firstSlide ? document.getElementById(`carousel-slide-${firstSlide.id}`) : null;
+      const thumbnail = el
+        ? null // Será gerado de forma assíncrona logo abaixo
+        : undefined;
+
+      // Gera o thumbnail assincronamente
+      const generateAndSave = async () => {
+        let thumbDataUrl: string | undefined;
+        if (el) {
+          try {
+            thumbDataUrl = await toPng(el, { pixelRatio: 0.5, cacheBust: true });
+          } catch (e) {
+            console.warn('Falha ao gerar thumbnail:', e);
+          }
+        }
+
+        const saved: SavedProject = {
+          id: `carousel-${Date.now()}`,
+          name,
+          type: 'carousel',
+          brandId: activeBrandId,
+          brandName: activeBrand.name,
+          thumbnail: thumbDataUrl,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          data: { project: { ...project, brandId: activeBrandId } },
+        };
+        saveProject(saved);
+        setLastSavedName(name);
+        setTimeout(() => setLastSavedName(null), 3000);
+      };
+
+      generateAndSave();
+    },
+    [project, activeBrandId, activeBrand, saveProject]
+  );
+
+  // Salvar projeto de CRIATIVO ÚNICO
+  const singleImageStateRef = useRef<any>(null);
+  const setSingleImageRef = useCallback((state: any) => {
+    singleImageStateRef.current = state;
+  }, []);
+
+  // Salvar projeto de POSE
+  const poseStateRef = useRef<any>(null);
+  const setPoseRef = useCallback((state: any) => {
+    poseStateRef.current = state;
+  }, []);
+
+  // Função genérica chamada pelo modal
+  const handleSaveProjectWithName = useCallback(
+    async (name: string) => {
+      const now = new Date().toISOString();
+
+      const buildAndSave = async (project: SavedProject) => {
+        saveProject(project);
+        setLastSavedName(name);
+        setTimeout(() => setLastSavedName(null), 3000);
+      };
+
+      if (saveModalType === 'carousel') {
+        handleSaveCarouselProject(name);
+        return;
+      }
+
+      if (saveModalType === 'single-image' && singleImageStateRef.current) {
+        const state = singleImageStateRef.current;
+        const el = document.getElementById('single-creative-canvas');
+        let thumbnail: string | undefined;
+        if (el) {
+          try {
+            thumbnail = await toPng(el, { pixelRatio: 0.5, cacheBust: true });
+          } catch (e) {
+            console.warn('Falha ao gerar thumbnail:', e);
+          }
+        }
+        await buildAndSave({
+          id: `single-${Date.now()}`,
+          name,
+          type: 'single-image',
+          brandId: activeBrandId,
+          brandName: activeBrand.name,
+          thumbnail,
+          createdAt: now,
+          updatedAt: now,
+          data: { ...state },
+        });
+        return;
+      }
+
+      if (saveModalType === 'pose' && poseStateRef.current) {
+        const state = poseStateRef.current;
+        const firstImage = state.generatedPoses?.[0];
+        await buildAndSave({
+          id: `pose-${Date.now()}`,
+          name,
+          type: 'pose',
+          brandId: activeBrandId,
+          brandName: activeBrand.name,
+          thumbnail: firstImage,
+          createdAt: now,
+          updatedAt: now,
+          data: { ...state },
+        });
+        return;
+      }
+    },
+    [saveModalType, handleSaveCarouselProject, activeBrandId, activeBrand, saveProject]
+  );
+
+  // Carregar projeto salvo (vai pra aba certa e aplica os dados)
+  const handleLoadProject = useCallback(
+    (project: SavedProject) => {
+      switch (project.type) {
+        case 'carousel': {
+          setActiveTab('carousel');
+          const data = project.data as { project: CarouselProject };
+          if (data.project) setProject(data.project);
+          setActiveBrandId(project.brandId);
+          break;
+        }
+        case 'single-image':
+          setActiveTab('single-image');
+          if (singleImageStateRef.current?.load) {
+            singleImageStateRef.current.load(project.data);
+          }
+          setActiveBrandId(project.brandId);
+          break;
+        case 'pose':
+          setActiveTab('poses');
+          if (poseStateRef.current?.load) {
+            poseStateRef.current.load(project.data);
+          }
+          setActiveBrandId(project.brandId);
+          break;
+        case 'batch-ads':
+          setActiveTab('batch-ads');
+          setActiveBrandId(project.brandId);
+          break;
+      }
+    },
+    []
+  );
+
   const apiKey = provider === 'openai' ? openaiApiKey : claudeApiKey;
   const hasApiKey = !!apiKey;
 
@@ -276,6 +465,14 @@ export default function Home() {
               }`}
             >
               <LayoutGrid size={13} /> Lote Meta Ads
+            </button>
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'projects' ? 'bg-brand-500 text-dark-900 shadow-md' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <FolderOpen size={13} /> Meus Projetos ({savedProjects.length})
             </button>
             <button
               onClick={() => setActiveTab('fonts')}
@@ -354,6 +551,13 @@ export default function Home() {
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-all"
                 >
                   <Wand2 size={15} /> Roteiro com IA
+                </button>
+
+                <button
+                  onClick={() => openSaveProjectModal('carousel', project.title || 'Carrossel')}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
+                >
+                  <Save size={15} /> Salvar Projeto
                 </button>
 
                 <button
@@ -471,6 +675,10 @@ export default function Home() {
             localFonts={localFonts}
             externalPersonImage={personImageForCreative}
             onClearExternalPerson={() => setPersonImageForCreative(null)}
+            onRegisterControls={(controls) => {
+              setSingleImageRef(controls);
+            }}
+            onSaveRequest={() => openSaveProjectModal('single-image', 'Criativo Único')}
           />
         )}
 
@@ -483,10 +691,31 @@ export default function Home() {
               setPersonImageForCreative(imgUrl);
               setActiveTab('single-image');
             }}
+            onRegisterControls={(controls) => {
+              setPoseRef(controls);
+            }}
+            onSaveRequest={() => openSaveProjectModal('pose', 'Pose / Pessoa')}
           />
         )}
 
-        {activeTab === 'batch-ads' && <AdBatchGenerator brand={activeBrand} />}
+        {activeTab === 'batch-ads' && (
+          <AdBatchGenerator
+            brand={activeBrand}
+            onSaveRequest={(payload) =>
+              openSaveProjectModal('batch-ads', payload?.name || 'Lote Meta Ads')
+            }
+          />
+        )}
+
+        {activeTab === 'projects' && (
+          <MyProjects
+            projects={savedProjects}
+            onLoadProject={handleLoadProject}
+            onDeleteProject={deleteProject}
+            onDuplicateProject={duplicateProject}
+            onImportProjects={importProjects}
+          />
+        )}
 
         {activeTab === 'fonts' && (
           <div className="max-w-3xl mx-auto p-8 rounded-3xl bg-[#0e111a] border border-white/10 text-center space-y-5">
@@ -576,6 +805,24 @@ export default function Home() {
           );
         }}
       />
+
+      {/* Modal unificado para salvar projeto */}
+      <SaveProjectModal
+        isOpen={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        onSave={handleSaveProjectWithName}
+        type={saveModalType}
+        defaultName={saveModalDefaultName}
+        existingId={saveModalExistingId}
+      />
+
+      {/* Notificação flutuante: projeto salvo com sucesso */}
+      {lastSavedName && (
+        <div className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4">
+          <CheckCircle2 size={18} />
+          <span className="text-sm font-bold">Projeto "{lastSavedName}" salvo!</span>
+        </div>
+      )}
     </main>
   );
 }

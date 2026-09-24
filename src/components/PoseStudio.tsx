@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BrandKit, LocalFont } from '@/types';
 import {
   User,
@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Lightbulb,
   RefreshCw,
+  Save,
 } from 'lucide-react';
 import saveAs from 'file-saver';
 
@@ -22,6 +23,8 @@ interface PoseStudioProps {
   apiKey: string;
   provider: 'openai' | 'Opus 4.8';
   onSendToCreative: (imageUrl: string) => void;
+  onRegisterControls?: (controls: { state: any; load: (data: any) => void }) => void;
+  onSaveRequest?: () => void;
 }
 
 const PRESET_POSES = [
@@ -94,6 +97,8 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
   apiKey,
   provider,
   onSendToCreative,
+  onRegisterControls,
+  onSaveRequest,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [faceImage, setFaceImage] = useState<string | null>(null);
@@ -104,6 +109,34 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedPoses, setGeneratedPoses] = useState<string[]>([]);
+
+  // Registrar estado + função de load para o componente pai poder salvar/carregar projetos
+  useEffect(() => {
+    if (!onRegisterControls) return;
+    onRegisterControls({
+      state: {
+        selectedPose,
+        selectedAttire,
+        selectedBg,
+        customDetails,
+        generatedPoses,
+      },
+      load: (data: any) => {
+        if (data.selectedPose) setSelectedPose(data.selectedPose);
+        if (data.selectedAttire) setSelectedAttire(data.selectedAttire);
+        if (data.selectedBg) setSelectedBg(data.selectedBg);
+        if ('customDetails' in data) setCustomDetails(data.customDetails || '');
+        if (Array.isArray(data.generatedPoses)) setGeneratedPoses(data.generatedPoses);
+      },
+    });
+  }, [
+    onRegisterControls,
+    selectedPose,
+    selectedAttire,
+    selectedBg,
+    customDetails,
+    generatedPoses,
+  ]);
 
   const handleUploadFace = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -355,6 +388,16 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
                 )}
               </button>
               {error && <p className="text-xs text-red-400 font-medium mt-2 text-center">{error}</p>}
+
+              {/* Botão Salvar Projeto */}
+              {onSaveRequest && (
+                <button
+                  onClick={onSaveRequest}
+                  className="mt-3 w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
+                >
+                  <Save size={14} /> Salvar Projeto
+                </button>
+              )}
             </div>
           </div>
         </div>

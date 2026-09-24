@@ -23,6 +23,7 @@ import {
   Eye,
   Trash2,
   Image as ImgIcon,
+  Save,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
@@ -34,6 +35,11 @@ interface SingleImageCreatorProps {
   localFonts: LocalFont[];
   externalPersonImage?: string | null;
   onClearExternalPerson?: () => void;
+  onRegisterControls?: (controls: {
+    state: any;
+    load: (data: any) => void;
+  }) => void;
+  onSaveRequest?: () => void;
 }
 
 export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
@@ -43,6 +49,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   localFonts,
   externalPersonImage,
   onClearExternalPerson,
+  onRegisterControls,
+  onSaveRequest,
 }) => {
   const bgFileInputRef = useRef<HTMLInputElement>(null);
   const personFileInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +112,109 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
 
   // Galeria de imagens geradas
   const [generatedGallery, setGeneratedGallery] = useState<string[]>([]);
+
+  // Registrar estado + função de load para o componente pai poder salvar/carregar projetos
+  useEffect(() => {
+    if (!onRegisterControls) return;
+    onRegisterControls({
+      state: {
+        format,
+        bgPrompt,
+        bgImage,
+        referenceImage,
+        logoImage,
+        logoPosition,
+        logoScale,
+        personImage,
+        personPosition,
+        personScale,
+        personFlipped,
+        personShadow,
+        personGlow,
+        personBottomFade,
+        showText,
+        showTopBar,
+        showTag,
+        showHandle,
+        showBadge,
+        customTopText,
+        tag,
+        headline,
+        highlightText,
+        subline,
+        ctaText,
+        showCta,
+        headlineFont,
+        textAlignment,
+        selectedBadge,
+        generatedGallery,
+      },
+      load: (data: any) => {
+        if (data.format) setFormat(data.format);
+        if ('bgPrompt' in data) setBgPrompt(data.bgPrompt);
+        if ('bgImage' in data) setBgImage(data.bgImage);
+        if ('referenceImage' in data) setReferenceImage(data.referenceImage);
+        if ('logoImage' in data) setLogoImage(data.logoImage);
+        if (data.logoPosition) setLogoPosition(data.logoPosition);
+        if (typeof data.logoScale === 'number') setLogoScale(data.logoScale);
+        if ('personImage' in data) setPersonImage(data.personImage);
+        if (data.personPosition) setPersonPosition(data.personPosition);
+        if (typeof data.personScale === 'number') setPersonScale(data.personScale);
+        if (typeof data.personFlipped === 'boolean') setPersonFlipped(data.personFlipped);
+        if (typeof data.personShadow === 'boolean') setPersonShadow(data.personShadow);
+        if (typeof data.personGlow === 'boolean') setPersonGlow(data.personGlow);
+        if (typeof data.personBottomFade === 'boolean') setPersonBottomFade(data.personBottomFade);
+        if (typeof data.showText === 'boolean') setShowText(data.showText);
+        if (typeof data.showTopBar === 'boolean') setShowTopBar(data.showTopBar);
+        if (typeof data.showTag === 'boolean') setShowTag(data.showTag);
+        if (typeof data.showHandle === 'boolean') setShowHandle(data.showHandle);
+        if (typeof data.showBadge === 'boolean') setShowBadge(data.showBadge);
+        if ('customTopText' in data) setCustomTopText(data.customTopText || '');
+        if ('tag' in data) setTag(data.tag || '');
+        if ('headline' in data) setHeadline(data.headline || '');
+        if ('highlightText' in data) setHighlightText(data.highlightText || '');
+        if ('subline' in data) setSubline(data.subline || '');
+        if ('ctaText' in data) setCtaText(data.ctaText || '');
+        if (typeof data.showCta === 'boolean') setShowCta(data.showCta);
+        if (data.headlineFont) setHeadlineFont(data.headlineFont);
+        if (data.textAlignment) setTextAlignment(data.textAlignment);
+        if ('selectedBadge' in data) setSelectedBadge(data.selectedBadge);
+        if (Array.isArray(data.generatedGallery)) setGeneratedGallery(data.generatedGallery);
+      },
+    });
+  }, [
+    onRegisterControls,
+    format,
+    bgPrompt,
+    bgImage,
+    referenceImage,
+    logoImage,
+    logoPosition,
+    logoScale,
+    personImage,
+    personPosition,
+    personScale,
+    personFlipped,
+    personShadow,
+    personGlow,
+    personBottomFade,
+    showText,
+    showTopBar,
+    showTag,
+    showHandle,
+    showBadge,
+    customTopText,
+    tag,
+    headline,
+    highlightText,
+    subline,
+    ctaText,
+    showCta,
+    headlineFont,
+    textAlignment,
+    selectedBadge,
+    generatedGallery,
+  ]);
 
   // Sincronizar imagem externa enviada do Estúdio de Poses
   useEffect(() => {
@@ -500,13 +611,25 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               )}
             </div>
 
-            {/* BOTÃO BAIXAR ARTE FINAL */}
-            <button
-              onClick={handleDownloadCanvas}
-              className="mt-5 w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-bold text-sm bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-xl shadow-brand-500/20"
-            >
-              <Download size={18} /> Baixar Criativo em Alta Resolução ({currentFormat.label})
-            </button>
+            {/* BOTÕES DE AÇÃO: SALVAR + BAIXAR */}
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              {onSaveRequest && (
+                <button
+                  onClick={onSaveRequest}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
+                >
+                  <Save size={16} /> Salvar Projeto
+                </button>
+              )}
+              <button
+                onClick={handleDownloadCanvas}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-lg ${
+                  onSaveRequest ? '' : 'col-span-2'
+                }`}
+              >
+                <Download size={16} /> Baixar ({currentFormat.label})
+              </button>
+            </div>
           </div>
         </div>
 

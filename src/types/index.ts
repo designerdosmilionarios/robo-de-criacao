@@ -66,3 +66,82 @@ export interface ApiSettings {
   falApiKey?: string;
   provider: 'openai' | 'Opus 4.8';
 }
+
+// =========================================
+// Sistema de Projetos Salvos (Meus Projetos)
+// =========================================
+
+export type SavedProjectType = 'carousel' | 'single-image' | 'pose' | 'batch-ads';
+
+export interface SavedProject {
+  id: string;
+  name: string;
+  type: SavedProjectType;
+  brandId: string;
+  brandName: string;
+  thumbnail?: string; // data URL da miniatura (primeiro slide ou preview)
+  createdAt: string;  // ISO date
+  updatedAt: string;  // ISO date
+  // Snapshot completo de tudo que foi feito (textos, imagens, cores, etc.)
+  data: SavedCarouselData | SavedSingleImageData | SavedPoseData | SavedBatchAdsData;
+}
+
+export interface SavedCarouselData {
+  project: CarouselProject;
+}
+
+export interface SavedSingleImageData {
+  format: '4:5' | '1:1' | '9:16' | '16:9';
+  bgPrompt: string;
+  bgImage: string | null;
+  referenceImage: string | null;
+  logoImage: string | null;
+  logoPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  logoScale: number;
+  personImage: string | null;
+  personPosition: 'right' | 'left' | 'center';
+  personScale: number;
+  personFlipped: boolean;
+  personShadow: boolean;
+  personGlow: boolean;
+  personBottomFade: boolean;
+  showText: boolean;
+  showTopBar: boolean;
+  showTag: boolean;
+  showHandle: boolean;
+  showBadge: boolean;
+  customTopText: string;
+  tag: string;
+  headline: string;
+  highlightText: string;
+  subline: string;
+  ctaText: string;
+  showCta: boolean;
+  headlineFont: string;
+  textAlignment: 'left' | 'center';
+  selectedBadge: string | null;
+  generatedGallery: string[];
+}
+
+export interface SavedPoseData {
+  selectedPose: string;
+  selectedAttire: string;
+  selectedBg: string;
+  customDetails: string;
+  generatedPoses: string[];
+}
+
+export interface SavedBatchAdsData {
+  productName: string;
+  audience: string;
+  tone: string;
+  variations: Array<{
+    id: string;
+    headline: string;
+    subheadline: string;
+    cta: string;
+    tag: string;
+    bgGradient: string;
+    imageUrl?: string;
+  }>;
+}

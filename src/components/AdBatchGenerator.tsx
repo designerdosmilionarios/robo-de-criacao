@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrandKit, AdVariation } from '@/types';
-import { Copy, Sparkles, Download, Layers, Check, LayoutGrid, Sliders } from 'lucide-react';
+import { Copy, Sparkles, Download, Layers, Check, LayoutGrid, Sliders, Save } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
 
 interface AdBatchGeneratorProps {
   brand: BrandKit;
+  onSaveRequest?: (payload: { name: string }) => void;
 }
 
-export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand }) => {
+export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand, onSaveRequest }) => {
   const [productTopic, setProductTopic] = useState('Consórcio Imobiliário sem Juros');
   const [targetPain, setTargetPain] = useState('Juros abusivos de financiamento bancário');
   const [selectedFormat, setSelectedFormat] = useState<'4:5' | '1:1' | '9:16'>('4:5');
@@ -186,11 +187,19 @@ export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand }) => 
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
+          {onSaveRequest && (
+            <button
+              onClick={() => onSaveRequest({ name: `Lote - ${productTopic.substring(0, 30)}` })}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
+            >
+              <Save size={14} /> Salvar Lote
+            </button>
+          )}
           <button
             onClick={handleGenerateBatch}
             disabled={isGenerating}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm bg-brand-500 text-dark-900 hover:bg-brand-400 transition-all shadow-xl disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm bg-brand-500 text-dark-900 hover:bg-brand-400 transition-all shadow-xl disabled:opacity-50 ml-auto"
           >
             <Sparkles size={16} />
             {isGenerating ? 'Criando Ângulos com IA...' : 'Gerar 4 Variações de Teste A/B'}
