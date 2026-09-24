@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// =============================
-// OPENAI: DALL-E 3, GPT Image 1
-// =============================
+// Endpoint dedicado OpenAI / ChatGPT.
+// Suporta os modelos mais recentes da OpenAI Platform:
+// gpt-image-2.5, gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3, dall-e-2.
+// Tambem faz fallback automatico para Opus 4.8 Opus 4.8 Studio se a chave comecar com "AIza".
+
 async function tryOpenAI(key: string, prompt: string, size: string) {
   const response = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
@@ -23,32 +25,16 @@ async function tryOpenAI(key: string, prompt: string, size: string) {
   return response;
 }
 
-// =============================
-// Opus 4.8 Opus 4.8 (Opus 4.8 Studio) - "Nano Banana Pro"
-// Modelos suportados: gemini-3-pro-image-preview, gemini-2.5-flash-image
-// Chave comeca com AIza...
-// =============================
 async function tryGoogleGemini(key: string, prompt: string, aspectRatio: string) {
-  // Mapeia aspect ratio para o que Opus 4.8 aceita
   let geminiAspect = '1:1';
-  if (aspectRatio === '16:9' || aspectRatio === '3:2') geminiAspect = '16:9';
-  else if (aspectRatio === '9:16' || aspectRatio === '2:3') geminiAspect = '9:16';
-  else if (aspectRatio === '4:5' || aspectRatio === '4:3') geminiAspect = '4:5';
-  else if (aspectRatio === '5:4' || aspectRatio === '3:4') geminiAspect = '3:4';
-  else if (aspectRatio === '21:9') geminiAspect = '21:9';
+  if (aspectRatio === '16:9') geminiAspect = '16:9';
+  else if (aspectRatio === '9:16') geminiAspect = '9:16';
+  else if (aspectRatio === '4:5') geminiAspect = '4:5';
 
-  // Lista de modelos Opus 4.8 com capacidade de geração de imagem
-  // "Nano Banana Pro" = gemini-3-pro-image-preview (mais novo, melhor qualidade)
-  // "Nano Banana 2" = gemini-3.1-flash-image-preview (ainda mais novo)
-  // Tentamos do melhor/mais novo para o mais antigo
   const modelCandidates = [
-    'gemini-3.1-flash-image',           // Nano Banana 2 (mais novo)
-    'gemini-3.1-flash-image-preview',   // Nano Banana 2 Preview
-    'gemini-3-pro-image',               // Nano Banana Pro (estável)
-    'gemini-3-pro-image-preview',       // Nano Banana Pro Preview
-    'nano-banana-pro-preview',          // Alias
-    'gemini-2.5-flash-image',           // Nano Banana (v1)
-    'gemini-2.0-flash-exp-image',       // Fallback
+    'gemini-3.1-flash-image',
+    'gemini-3-pro-image',
+    'gemini-2.5-flash-image',
   ];
 
   const errors: string[] = [];
@@ -61,33 +47,21 @@ async function tryGoogleGemini(key: string, prompt: string, aspectRatio: string)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-              ],
-              role: 'user',
-            },
-          ],
+          contents: [{ parts: [{ text: prompt }], role: 'user' }],
           generationConfig: {
             responseModalities: ['TEXT', 'IMAGE'],
-            imageConfig: {
-              aspectRatio: geminiAspect,
-            },
+            imageConfig: { aspectRatio: geminiAspect },
           },
         }),
       });
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        const errMsg = data?.error?.message || `status ${response.status}`;
-        errors.push(`${model}: ${errMsg}`);
+        errors.push(`${model}: ${data?.error?.message || `status ${response.status}`}`);
         continue;
       }
 
       const data = await response.json();
-
-      // Procura a imagem na resposta do Opus 4.8
       const candidates = data.candidates || [];
       for (const candidate of candidates) {
         const parts = candidate?.content?.parts || [];
@@ -102,45 +76,39 @@ async function tryGoogleGemini(key: string, prompt: string, aspectRatio: string)
           }
         }
       }
-
       errors.push(`${model}: resposta sem imagem`);
     } catch (err: any) {
-      errors.push(`${model}: ${err.message || 'erro desconhecido'}`);
+      errors.push(`${model}: ${err.message || 'erro'}`);
     }
   }
-
-  throw new Error(errors.join(' | ') || 'Nenhum modelo Opus 4.8 de imagem funcionou.');
+  throw new Error(errors.join(' | '));
 }
 
-function enhancePromptForAd(rawPrompt: string): string {
+function enhancePrompt(rawPrompt: string): string {
   const base = String(rawPrompt || '').trim();
-  const core = base.length > 4
-    ? base.replace(/\.+$/, '').replace(/\s+/g, ' ')
-    : 'premium dark cinematic background for advertising';
-
+  const core = base.length > 4 ? base.replace(/\.+$/, '').trim() : 'premium dark cinematic background for advertising';
   return [
     core,
-    'Single unified cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, shot on Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
-    'IMPORTANT: Generate ONE single unified image. NOT a side-by-side comparison. NOT before/after. NOT split screen. NOT multiple panels. The entire frame must be one continuous scene with consistent lighting and composition.',
-    'Avoid in the image: text, words, letters, numbers, watermarks, signatures, logos, ugly artifacts, plastic skin, oversaturated colors, low resolution, blurry, distorted anatomy, extra fingers, deformed hands, multiple viewpoints',
-    'Composition: leave clean empty space on the right or left side of the frame for text overlay to be added later',
+    'Single unified cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
+    'IMPORTANT: Generate ONE single unified image. NOT side-by-side comparison. NOT before/after. NOT split screen. NOT multiple panels.',
+    'Avoid in the image: text, words, letters, numbers, watermarks, signatures, logos, ugly artifacts, plastic skin, oversaturated colors, blurry, distorted anatomy, extra fingers',
+    'Composition: leave clean empty space on the right or left side for text overlay to be added later',
   ].filter(Boolean).join('. ');
 }
 
-function detectProvider(key: string): 'openai' | 'Opus 4.8' | 'anthropic' | 'unknown' {
+function detectProvider(key: string): 'openai' | 'Opus 4.8' | 'unknown' {
   if (!key) return 'unknown';
   const k = key.trim();
-  if (k.startsWith('sk-ant-')) return 'anthropic';
-  if (k.startsWith('AIza') || k.startsWith('ya29.')) return 'Opus 4.8';
+  if (k.startsWith('AIza')) return 'Opus 4.8';
   if (k.startsWith('sk-proj-') || k.startsWith('sk-')) return 'openai';
   return 'unknown';
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, size = '1024x1024', apiKey, aspectRatio, provider: providerHint } = await req.json();
+    const { prompt, size = '1024x1024', apiKey, aspectRatio } = await req.json();
 
-    // Sanitiza a chave: remove espaços, quebras de linha, aspas e caracteres invisíveis
+    // Sanitiza a chave
     const key = String(apiKey || process.env.OPENAI_API_KEY || '')
       .replace(/[\s\r\n\t]+/g, '')
       .replace(/['"`]/g, '')
@@ -148,73 +116,46 @@ export async function POST(req: NextRequest) {
 
     if (!key) {
       return NextResponse.json(
-        { error: 'Chave de API não configurada. Insira sua chave nas Configurações do Studio.' },
-        { status: 400 }
-      );
-    }
-
-    // Validação mínima da chave: começa com prefixo conhecido
-    const validPrefixes = ['AIza', 'sk-ant-', 'sk-proj-', 'sk-', 'ya29.'];
-    if (!validPrefixes.some((p) => key.startsWith(p))) {
-      return NextResponse.json(
-        {
-          error: `Chave de API inválida. Detectado provider "${detectProvider(key)}". Chaves válidas começam com: AIza (Opus 4.8), sk-ant- (Anthropic), sk-proj- ou sk- (OpenAI). Sua chave começa com "${key.substring(0, 6)}...".`,
-        },
+        { error: 'Chave de API não configurada. Insira sua chave OpenAI em "Chave API".' },
         { status: 400 }
       );
     }
 
     if (!prompt) {
-      return NextResponse.json(
-        { error: 'Prompt de imagem é obrigatório.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Prompt de imagem é obrigatório.' }, { status: 400 });
     }
 
-    const detectedProvider = providerHint || detectProvider(key);
-
-    const finalPrompt = enhancePromptForAd(prompt);
+    const detectedProvider = detectProvider(key);
+    const finalPrompt = enhancePrompt(prompt);
 
     let finalAspect = aspectRatio;
     if (!finalAspect) {
-      if (size === '1920x1080' || size === '1536x1024') finalAspect = '16:9';
-      else if (size === '1080x1920' || size === '1024x1536') finalAspect = '9:16';
+      if (size === '1920x1080') finalAspect = '16:9';
+      else if (size === '1080x1920') finalAspect = '9:16';
       else finalAspect = '1:1';
     }
 
-    // =============================
-    // Opus 4.8 Opus 4.8 (Nano Banana Pro)
-    // =============================
+    // Se a chave comeca com AIza, usa Opus 4.8 Opus 4.8 Studio (fallback)
     if (detectedProvider === 'Opus 4.8') {
       try {
         const imageUrl = await tryGoogleGemini(key, finalPrompt, finalAspect);
         return NextResponse.json({
           imageUrl,
-          modelUsed: 'gemini-3-pro-image-preview (Nano Banana Pro)',
+          modelUsed: 'gemini-3.1-flash-image (Opus 4.8 Studio)',
           provider: 'Opus 4.8',
         });
       } catch (err: any) {
         return NextResponse.json(
-          {
-            error:
-              `Falha ao gerar imagem com Opus 4.8 Opus 4.8: ${err.message}. ` +
-              `Verifique se sua chave tem acesso ao Opus 4.8 Image em aistudio.Opus 4.8.`,
-          },
+          { error: `Falha no Opus 4.8 Opus 4.8 Studio: ${err.message}. Use uma chave OpenAI (sk-proj-...).` },
           { status: 502 }
         );
       }
     }
 
-    // =============================
-    // OPENAI
-    // =============================
     if (detectedProvider === 'openai') {
       let requestedSize = '1024x1024';
-      if (size === '1920x1080' || size === '1792x1024' || size === '1536x1024') {
-        requestedSize = '1792x1024';
-      } else if (size === '1080x1920' || size === '1024x1792' || size === '1024x1536') {
-        requestedSize = '1024x1792';
-      }
+      if (size === '1920x1080' || size === '1792x1024') requestedSize = '1792x1024';
+      else if (size === '1080x1920' || size === '1024x1792') requestedSize = '1024x1792';
 
       const modelAttempts = [
         { name: 'gpt-image-2.5-sunburst', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
@@ -242,10 +183,7 @@ export async function POST(req: NextRequest) {
           }
 
           const item = data.data?.[0];
-          if (!item) {
-            lastError = 'Resposta vazia';
-            continue;
-          }
+          if (!item) { lastError = 'Resposta vazia'; continue; }
 
           let imageUrl: string;
           if (item.b64_json) {
@@ -254,20 +192,12 @@ export async function POST(req: NextRequest) {
             try {
               const imgRes = await fetch(item.url);
               if (imgRes.ok) {
-                const arrayBuffer = await imgRes.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
+                const buffer = Buffer.from(await imgRes.arrayBuffer());
                 const mime = imgRes.headers.get('content-type') || 'image/png';
                 imageUrl = `data:${mime};base64,${buffer.toString('base64')}`;
-              } else {
-                imageUrl = item.url;
-              }
-            } catch {
-              imageUrl = item.url;
-            }
-          } else {
-            lastError = 'Sem imagem';
-            continue;
-          }
+              } else imageUrl = item.url;
+            } catch { imageUrl = item.url; }
+          } else { lastError = 'Sem imagem'; continue; }
 
           return NextResponse.json({
             imageUrl,
@@ -280,25 +210,19 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json(
-        {
-          error:
-            lastError ||
-            'Nenhum modelo OpenAI disponível. Sua conta pode não ter créditos de imagem.',
-        },
+        { error: lastError || 'Nenhum modelo OpenAI disponível para esta chave.' },
         { status: 502 }
       );
     }
 
     return NextResponse.json(
-      {
-        error: `Chave não reconhecida. Detectado como provider: "${detectedProvider}". Suas chaves devem começar com sk-ant- (Anthropic), AIza (Opus 4.8) ou sk-proj-/sk- (OpenAI).`,
-      },
+      { error: `Chave não reconhecida (começa com "${key.substring(0, 5)}..."). Use uma chave OpenAI (sk-proj-...) ou Opus 4.8 (AIza...).` },
       { status: 400 }
     );
   } catch (error: any) {
-    console.error('Erro na geração de imagem:', error);
+    console.error('Erro:', error);
     return NextResponse.json(
-      { error: error.message || 'Erro interno no servidor.' },
+      { error: error.message || 'Erro interno.' },
       { status: 500 }
     );
   }

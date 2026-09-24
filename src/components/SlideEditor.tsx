@@ -15,7 +15,7 @@ interface SlideEditorProps {
   onChangeAspectRatio: (ratio: '4:5' | '1:1' | '9:16') => void;
   apiKey?: string;
   onOpenSettings: () => void;
-  provider: 'openai' | 'Opus 4.8';
+  provider?: 'openai';
 }
 
 export const SlideEditor: React.FC<SlideEditorProps> = ({
@@ -59,7 +59,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           apiKey,
           size: '1024x1024',
           aspectRatio: '1:1',
-          provider: provider === 'Opus 4.8' ? 'Opus 4.8' : 'openai',
+          provider: 'openai',
         }),
       });
       const data = await res.json();
@@ -68,7 +68,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       }
       handleChange('imageUrl', data.imageUrl);
     } catch (err: any) {
-      setImgError(err.message || `Erro ao conectar ao ${provider === 'Opus 4.8' ? 'Opus 4.8' : 'OpenAI'}.`);
+      setImgError(err.message || `Erro ao conectar à OpenAI.`);
     } finally {
       setIsGeneratingImg(false);
     }

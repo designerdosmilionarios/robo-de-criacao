@@ -37,7 +37,7 @@ import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import saveAs from 'file-saver';
 
-type AIProvider = 'openai' | 'Opus 4.8';
+type AIProvider = 'openai';
 type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects';
 
 export default function Home() {
@@ -54,8 +54,7 @@ export default function Home() {
 
   // Estado de chaves
   const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
-  const [claudeApiKey, setClaudeApiKey] = useState<string>('');
-  const [provider, setProvider] = useState<AIProvider>('Opus 4.8');
+  const [provider, setProvider] = useState<AIProvider>('openai');
 
   // Fontes locais
   const [localFonts, setLocalFonts] = useState<LocalFont[]>([]);
@@ -90,9 +89,8 @@ export default function Home() {
   // Carregar configurações salvas
   useEffect(() => {
     setOpenaiApiKey(localStorage.getItem('openai_api_key') || '');
-    setClaudeApiKey(localStorage.getItem('claude_api_key') || '');
-    const savedProvider = localStorage.getItem('provider');
-    setProvider((savedProvider === 'openai' || savedProvider === 'Opus 4.8') ? savedProvider : 'Opus 4.8');
+    // Limpar chave antiga do Google/Claude se existir (não usa mais)
+    localStorage.removeItem('claude_api_key');
 
     try {
       const savedFonts = localStorage.getItem('local_fonts');
@@ -405,24 +403,7 @@ export default function Home() {
     []
   );
 
-  // Detecta automaticamente qual chave usar pelo prefixo:
-  // - AIza... → Opus 4.8 Opus 4.8 Studio (Opus 4.8)
-  // - sk-ant-... → Anthropic Opus 4.8
-  // - sk-proj-... ou sk-... → OpenAI
-  // Se tiver mais de uma chave salva, usa a do provider selecionado como preferência,
-  // mas faz fallback para a outra que tenha prefixo compatível.
-  const pickApiKey = (): string => {
-    const candidates = [provider === 'openai' ? openaiApiKey : claudeApiKey, provider === 'openai' ? claudeApiKey : openaiApiKey];
-    for (const key of candidates) {
-      const k = String(key || '').trim();
-      if (!k) continue;
-      // Aceita qualquer chave não-vazia; o servidor detecta o provider pelo prefixo
-      return k;
-    }
-    return '';
-  };
-
-  const apiKey = pickApiKey();
+  const apiKey = openaiApiKey;
   const hasApiKey = !!apiKey;
 
   return (
@@ -503,25 +484,7 @@ export default function Home() {
 
           {/* SELETOR DE CLIENTE + API */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Provider Switcher - apenas 2 opcoes */}
-            <div className="inline-flex items-center bg-white/5 border border-white/10 rounded-xl p-1">
-              <button
-                onClick={() => setProvider('Opus 4.8')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                  provider === 'Opus 4.8' ? 'bg-emerald-500/20 text-emerald-300 shadow' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Opus 4.8 Studio
-              </button>
-              <button
-                onClick={() => setProvider('openai')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                  provider === 'openai' ? 'bg-emerald-500/20 text-emerald-300 shadow' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                OpenAI
-              </button>
-            </div>
+            {/* Removido: Provider Switcher (só OpenAI agora) */}
 
             <button
               onClick={() => setIsBrandModalOpen(true)}
@@ -796,16 +759,11 @@ export default function Home() {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         openaiApiKey={openaiApiKey}
-        claudeApiKey={claudeApiKey}
-        provider={provider}
-        onSaveApiKey={(key, prov) => {
-          if (prov === 'openai') {
-            setOpenaiApiKey(key);
-            localStorage.setItem('openai_api_key', key);
-          } else {
-            setClaudeApiKey(key);
-            localStorage.setItem('claude_api_key', key);
-          }
+        claudeApiKey=""
+        provider="openai"
+        onSaveApiKey={(key) => {
+          setOpenaiApiKey(key);
+          localStorage.setItem('openai_api_key', key);
         }}
       />
 

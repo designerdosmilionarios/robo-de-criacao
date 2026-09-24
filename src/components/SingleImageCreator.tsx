@@ -31,7 +31,7 @@ import saveAs from 'file-saver';
 interface SingleImageCreatorProps {
   brand: BrandKit;
   apiKey: string;
-  provider: 'openai' | 'Opus 4.8';
+  provider?: 'openai';
   localFonts: LocalFont[];
   externalPersonImage?: string | null;
   onClearExternalPerson?: () => void;
@@ -45,7 +45,6 @@ interface SingleImageCreatorProps {
 export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   brand,
   apiKey,
-  provider,
   localFonts,
   externalPersonImage,
   onClearExternalPerson,
@@ -925,7 +924,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     </>
                   ) : (
                     <>
-                      <Sparkles size={13} /> Gerar Background ({provider === 'Opus 4.8' ? 'Opus 4.8' : 'OpenAI'})
+                      <Sparkles size={13} /> Gerar Background (OpenAI)
                     </>
                   )}
                 </button>

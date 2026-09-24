@@ -21,7 +21,7 @@ import saveAs from 'file-saver';
 interface PoseStudioProps {
   brand: BrandKit;
   apiKey: string;
-  provider: 'openai' | 'Opus 4.8';
+  provider: 'openai';
   onSendToCreative: (imageUrl: string) => void;
   onRegisterControls?: (controls: { state: any; load: (data: any) => void }) => void;
   onSaveRequest?: () => void;
@@ -175,13 +175,13 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
         .filter(Boolean)
         .join(' ');
 
-      const endpoint = provider === 'Opus 4.8' ? '/api/generate-image' : '/api/generate-image';
+      const endpoint = '/api/generate-image';
 
       const requestBody: any = {
         prompt: fullPrompt,
         size: '1024x1024',
         aspectRatio: '1:1',
-        provider: provider === 'Opus 4.8' ? 'Opus 4.8' : 'openai',
+        provider: 'openai',
         apiKey,
       };
 
@@ -385,7 +385,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
                   </>
                 ) : (
                   <>
-                    <Sparkles size={18} /> Gerar Pessoa Nesta Pose ({provider === 'Opus 4.8' ? 'Opus 4.8' : 'OpenAI'})
+                    <Sparkles size={18} /> Gerar Pessoa Nesta Pose (OpenAI)
                   </>
                 )}
               </button>
