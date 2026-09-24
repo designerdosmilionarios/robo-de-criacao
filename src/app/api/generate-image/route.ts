@@ -16,6 +16,26 @@ async function tryGenerate(key: string, model: string, prompt: string, size: str
   return response;
 }
 
+// Faz upgrade automático do prompt do usuário para gerar imagens profissionais de marketing.
+// - Sempre entrega uma única imagem cinematográfica (sem composições divididas)
+// - Bloqueia o modo "comparação" ou "antes/depois"
+// - Reforça qualidade de anúncio / thumb
+function enhancePromptForAd(rawPrompt: string): string {
+  const base = String(rawPrompt || '').trim();
+  // Se o usuário já digitou algo, usa como núcleo. Se não, gera um placeholder neutro.
+  const core = base.length > 4
+    ? base.replace(/\.+$/, '').replace(/\s+/g, ' ')
+    : 'premium dark cinematic background for advertising';
+
+  return [
+    core,
+    'A single cohesive cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, shot on Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
+    'IMPORTANT: Generate ONE single unified image, NOT a side-by-side comparison, NOT before/after, NOT split screen, NOT multiple panels. The entire frame must be a single continuous scene with one consistent lighting and composition.',
+    'Avoid: text, words, letters, numbers, watermarks, signatures, logos, ugly artifacts, plastic skin, oversaturated colors, low resolution, blurry, distorted anatomy, extra fingers, deformed hands, multiple viewpoints',
+    'Aspect ratio composition should leave clean space on the right or left side for text overlay to be added later',
+  ].filter(Boolean).join('. ');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { prompt, size = '1024x1024', apiKey } = await req.json();
@@ -36,6 +56,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Aplica o upgrade de prompt (sempre, independente do modelo)
+    const finalPrompt = enhancePromptForAd(prompt);
+
     // Mapeia o formato solicitado para o tamanho mais próximo aceito
     let requestedSize = '1024x1024';
     if (size === '1920x1080' || size === '1792x1024' || size === '1536x1024') {
@@ -45,7 +68,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Lista de modelos para tentar, do melhor/mais novo para o mais antigo
-    // Inclui variantes preview e 1.5 que estão sendo liberadas aos poucos
     const modelAttempts = [
       { name: 'gpt-image-1.5', size: requestedSize, supportsB64: true },
       { name: 'gpt-image-1', size: requestedSize, supportsB64: true },
@@ -57,22 +79,19 @@ export async function POST(req: NextRequest) {
     let lastError: any = null;
     for (const attempt of modelAttempts) {
       try {
-        const response = await tryGenerate(key, attempt.name, prompt, attempt.size);
+        const response = await tryGenerate(key, attempt.name, finalPrompt, attempt.size);
 
         const data = await response.json();
 
         if (!response.ok) {
           lastError = data.error?.message || `Falha com modelo ${attempt.name} (status ${response.status})`;
           console.warn(`[generate-image] ${attempt.name} falhou:`, lastError);
-          // Se for erro 400 (parâmetro inválido) ou 404 (modelo não existe), tenta o próximo
           if (response.status === 400 || response.status === 404) {
             continue;
           }
-          // Para outros erros (401, 429, 500), propaga
           return NextResponse.json({ error: lastError }, { status: response.status });
         }
 
-        // Resposta bem-sucedida
         const item = data.data?.[0];
         if (!item) {
           lastError = `Modelo ${attempt.name} retornou resposta vazia.`;
@@ -82,12 +101,9 @@ export async function POST(req: NextRequest) {
         let imageUrl: string;
         let revisedPrompt: string | undefined;
 
-        // gpt-image-1 e dall-e-2 retornam b64_json por padrão
         if (item.b64_json) {
           imageUrl = `data:image/png;base64,${item.b64_json}`;
         } else if (item.url) {
-          // dall-e-3 retorna URL temporária
-          // Faz download server-side para converter em base64
           try {
             const imgRes = await fetch(item.url);
             if (imgRes.ok) {

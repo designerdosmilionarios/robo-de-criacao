@@ -295,7 +295,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       };
 
       const requestBody: any = {
-        prompt: `${bgPrompt || 'Professional commercial advertising background, matching style'}, ultra-detailed, depth of field, high aesthetic lighting`,
+        prompt: bgPrompt || 'premium dark cinematic background for advertising',
         size: sizeMap[format],
         apiKey,
       };
