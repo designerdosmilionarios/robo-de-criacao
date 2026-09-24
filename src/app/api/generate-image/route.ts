@@ -170,20 +170,24 @@ export async function POST(req: NextRequest) {
         { name: 'dall-e-2', size: '1024x1024' },
       ];
 
-      let lastError: any = null;
+      const errorLog: string[] = [];
       for (const attempt of modelAttempts) {
         try {
           const response = await tryOpenAI(key, finalPrompt, attempt.size);
           const data = await response.json();
 
           if (!response.ok) {
-            lastError = data.error?.message || `Falha (status ${response.status})`;
-            if (response.status === 400 || response.status === 404) continue;
-            return NextResponse.json({ error: lastError }, { status: response.status });
+            const errMsg = data.error?.message || `Falha (status ${response.status})`;
+            errorLog.push(`${attempt.name}: ${errMsg}`);
+            // Continua tentando outros modelos em qualquer erro de modelo
+            continue;
           }
 
           const item = data.data?.[0];
-          if (!item) { lastError = 'Resposta vazia'; continue; }
+          if (!item) {
+            errorLog.push(`${attempt.name}: resposta vazia`);
+            continue;
+          }
 
           let imageUrl: string;
           if (item.b64_json) {
@@ -197,7 +201,10 @@ export async function POST(req: NextRequest) {
                 imageUrl = `data:${mime};base64,${buffer.toString('base64')}`;
               } else imageUrl = item.url;
             } catch { imageUrl = item.url; }
-          } else { lastError = 'Sem imagem'; continue; }
+          } else {
+            errorLog.push(`${attempt.name}: sem imagem`);
+            continue;
+          }
 
           return NextResponse.json({
             imageUrl,
@@ -205,12 +212,15 @@ export async function POST(req: NextRequest) {
             provider: 'openai',
           });
         } catch (err: any) {
-          lastError = err.message;
+          errorLog.push(`${attempt.name}: ${err.message}`);
         }
       }
 
       return NextResponse.json(
-        { error: lastError || 'Nenhum modelo OpenAI disponível para esta chave.' },
+        {
+          error: `Nenhum modelo OpenAI funcionou com esta chave. Detalhes: ${errorLog.slice(0, 5).join(' | ')}`,
+          triedModels: errorLog,
+        },
         { status: 502 }
       );
     }
