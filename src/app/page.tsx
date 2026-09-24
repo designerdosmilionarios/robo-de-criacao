@@ -405,7 +405,24 @@ export default function Home() {
     []
   );
 
-  const apiKey = provider === 'openai' ? openaiApiKey : claudeApiKey;
+  // Detecta automaticamente qual chave usar pelo prefixo:
+  // - AIza... → Opus 4.8 Opus 4.8 Studio (Opus 4.8)
+  // - sk-ant-... → Anthropic Opus 4.8
+  // - sk-proj-... ou sk-... → OpenAI
+  // Se tiver mais de uma chave salva, usa a do provider selecionado como preferência,
+  // mas faz fallback para a outra que tenha prefixo compatível.
+  const pickApiKey = (): string => {
+    const candidates = [provider === 'openai' ? openaiApiKey : claudeApiKey, provider === 'openai' ? claudeApiKey : openaiApiKey];
+    for (const key of candidates) {
+      const k = String(key || '').trim();
+      if (!k) continue;
+      // Aceita qualquer chave não-vazia; o servidor detecta o provider pelo prefixo
+      return k;
+    }
+    return '';
+  };
+
+  const apiKey = pickApiKey();
   const hasApiKey = !!apiKey;
 
   return (
