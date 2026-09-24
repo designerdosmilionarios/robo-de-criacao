@@ -17,6 +17,7 @@ import {
   Save,
 } from 'lucide-react';
 import saveAs from 'file-saver';
+import { optimizeImageDataUrl } from '@/lib/imageData';
 
 interface PoseStudioProps {
   brand: BrandKit;
@@ -189,7 +190,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
       };
 
       if (faceImage) {
-        requestBody.imageBase64 = faceImage;
+        requestBody.imageBase64 = await optimizeImageDataUrl(faceImage);
       }
 
       const res = await fetch(endpoint, {

@@ -18,6 +18,7 @@ import {
   Zap,
   Hash,
 } from 'lucide-react';
+import { optimizeImageDataUrl } from '@/lib/imageData';
 
 // Tipos de blocos disponiveis no canvas
 export type BlockType =
@@ -857,6 +858,12 @@ async function generateImage(
   const enhancedPrompt = references.length > 0
     ? `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}. This image has ${references.length} visual reference(s) attached - use them as inspiration for style, composition, and mood.`
     : `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}`;
+  const referenceImages = await Promise.all(
+    [logoUrl, ...references]
+      .filter((value): value is string => Boolean(value))
+      .slice(0, 4)
+      .map((value) => optimizeImageDataUrl(value, 1280, 0.78))
+  );
 
   const res = await fetch('/api/generate-image', {
     method: 'POST',
@@ -868,12 +875,7 @@ async function generateImage(
       provider: 'openai',
       preferredModel: 'auto',
       apiKey,
-      // Prioridade: referencia principal (logo ou primeira reference)
-      ...(logoUrl
-        ? { imageBase64: logoUrl.replace(/^data:image\/\w+;base64,/, '') }
-        : references[0]
-        ? { imageBase64: references[0].replace(/^data:image\/\w+;base64,/, '') }
-        : {}),
+      ...(referenceImages.length > 0 ? { referenceImages } : {}),
     }),
   });
   const data = await res.json();

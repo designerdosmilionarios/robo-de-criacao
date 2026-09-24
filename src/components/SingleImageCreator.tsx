@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
+import { optimizeImageDataUrl } from '@/lib/imageData';
 import { CreativeDirectorPanel } from '@/components/CreativeDirectorPanel';
 import {
   TypographyControl,
@@ -436,7 +437,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       };
 
       if (referenceImage) {
-        requestBody.imageBase64 = referenceImage;
+        requestBody.imageBase64 = await optimizeImageDataUrl(referenceImage);
       }
 
       const res = await fetch(endpoint, {
@@ -485,6 +486,9 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     };
 
     const variations: string[] = [];
+    const optimizedReference = referenceImage
+      ? await optimizeImageDataUrl(referenceImage)
+      : null;
     for (let i = 0; i < variationsCount; i++) {
       try {
         const res = await fetch('/api/generate-image', {
@@ -496,7 +500,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             aspectRatio: format,
             preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
             apiKey,
-            ...(referenceImage ? { imageBase64: referenceImage } : {}),
+            ...(optimizedReference ? { imageBase64: optimizedReference } : {}),
           }),
         });
         const data = await res.json();
@@ -544,8 +548,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       '1:1': '1024x1024',
     };
 
-    // Pega base64 da imagem atual (sem o prefixo data:image/...)
-    const base64Image = bgImage;
+    // Prepara a imagem atual para usa-la como referencia no refinamento.
+    const base64Image = await optimizeImageDataUrl(bgImage);
 
     try {
       const res = await fetch('/api/generate-image', {

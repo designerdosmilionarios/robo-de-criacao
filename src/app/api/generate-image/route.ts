@@ -8,7 +8,6 @@ export const runtime = 'nodejs';
 // Tambem faz fallback automatico para Opus 4.8 Opus 4.8 Studio se a chave comecar com "AIza".
 
 async function tryOpenAI(key: string, prompt: string, size: string, model: string) {
-  // gpt-image-* models nao aceitam parametro "size" nem "quality"
   const isGptImage = model.startsWith('gpt-image');
 
   const body: any = {
@@ -36,6 +35,65 @@ async function tryOpenAI(key: string, prompt: string, size: string, model: strin
     body: JSON.stringify(body),
   });
   return response;
+}
+
+type ReferenceImage = {
+  bytes: ArrayBuffer;
+  mimeType: string;
+  extension: string;
+};
+
+function parseReferenceImage(value: string): ReferenceImage {
+  const match = value.match(/^data:(image\/(?:png|jpe?g|webp));base64,([\s\S]+)$/i);
+  if (value.startsWith('data:') && !match) {
+    throw new Error('Formato de referencia nao suportado. Use PNG, JPG ou WebP.');
+  }
+  const mimeType = match?.[1]?.toLowerCase() || 'image/png';
+  const encoded = (match?.[2] || value).replace(/\s+/g, '');
+  if (!/^[a-z0-9+/]+={0,2}$/i.test(encoded)) {
+    throw new Error('Imagem de referencia invalida.');
+  }
+  const buffer = Buffer.from(encoded, 'base64');
+
+  if (buffer.length === 0) throw new Error('Imagem de referencia vazia ou invalida.');
+  if (buffer.length > 10 * 1024 * 1024) {
+    throw new Error('Cada imagem de referencia deve ter no maximo 10 MB.');
+  }
+
+  const extension = mimeType === 'image/jpeg' || mimeType === 'image/jpg'
+    ? 'jpg'
+    : mimeType.split('/')[1];
+  const bytes = Uint8Array.from(buffer).buffer as ArrayBuffer;
+  return { bytes, mimeType, extension };
+}
+
+async function tryOpenAIEdit(
+  key: string,
+  prompt: string,
+  size: string,
+  model: string,
+  references: string[]
+) {
+  const form = new FormData();
+  form.append('model', model);
+  form.append('prompt', prompt);
+  form.append('n', '1');
+  form.append('size', size);
+
+  references.slice(0, 4).forEach((reference, index) => {
+    const image = parseReferenceImage(reference);
+    form.append(
+      'image[]',
+      new Blob([image.bytes], { type: image.mimeType }),
+      `reference-${index + 1}.${image.extension}`
+    );
+  });
+
+  return fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key.trim()}` },
+    body: form,
+  });
 }
 
 async function tryGoogleGemini(key: string, prompt: string, aspectRatio: string) {
@@ -104,7 +162,7 @@ function enhancePrompt(rawPrompt: string): string {
     core,
     'Single unified cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
     'IMPORTANT: Generate ONE single unified image. NOT side-by-side comparison. NOT before/after. NOT split screen. NOT multiple panels.',
-    'Avoid in the image: text, words, letters, numbers, watermarks, signatures, logos, ugly artifacts, plastic skin, oversaturated colors, blurry, distorted anatomy, extra fingers',
+    'Avoid in the image: unintended text, words, letters, numbers, watermarks, signatures, unrequested logos, ugly artifacts, plastic skin, oversaturated colors, blurry, distorted anatomy, extra fingers',
     'Composition: leave clean empty space on the right or left side for text overlay to be added later',
   ].filter(Boolean).join('. ');
 }
@@ -119,7 +177,15 @@ function detectProvider(key: string): 'openai' | 'Opus 4.8' | 'unknown' {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, size = '1024x1024', apiKey, aspectRatio, preferredModel } = await req.json();
+    const {
+      prompt,
+      size = '1024x1024',
+      apiKey,
+      aspectRatio,
+      preferredModel,
+      imageBase64,
+      referenceImages,
+    } = await req.json();
 
     // Sanitiza a chave
     const key = String(apiKey || process.env.OPENAI_API_KEY || '')
@@ -139,7 +205,17 @@ export async function POST(req: NextRequest) {
     }
 
     const detectedProvider = detectProvider(key);
-    const finalPrompt = enhancePrompt(prompt);
+    const inputReferences = [
+      ...(typeof imageBase64 === 'string' ? [imageBase64] : []),
+      ...(Array.isArray(referenceImages)
+        ? referenceImages.filter((value): value is string => typeof value === 'string')
+        : []),
+    ].slice(0, 4);
+    const finalPrompt = enhancePrompt(
+      inputReferences.length > 0
+        ? `${prompt}. Preserve the identity, recognizable features, products, and visual details supplied in the reference images.`
+        : prompt
+    );
 
     let finalAspect = aspectRatio;
     if (!finalAspect) {
@@ -198,12 +274,14 @@ export async function POST(req: NextRequest) {
       const errorLog: string[] = [];
       for (const attempt of modelAttempts) {
         try {
-          const response = await tryOpenAI(key, finalPrompt, attempt.size, attempt.name);
+          const response = inputReferences.length > 0
+            ? await tryOpenAIEdit(key, finalPrompt, attempt.size, attempt.name, inputReferences)
+            : await tryOpenAI(key, finalPrompt, attempt.size, attempt.name);
           const data = await response.json();
 
           if (!response.ok) {
             const errMsg = data.error?.message || `Falha (status ${response.status})`;
-            errorLog.push(`${attempt.name}: ${errMsg}`);
+            errorLog.push(`${attempt.name} (${inputReferences.length > 0 ? 'edicao' : 'geracao'}): ${errMsg}`);
             // Continua tentando outros modelos em qualquer erro de modelo
             continue;
           }
@@ -235,6 +313,7 @@ export async function POST(req: NextRequest) {
             imageUrl,
             modelUsed: attempt.name,
             provider: 'openai',
+            mode: inputReferences.length > 0 ? 'edit' : 'generation',
           });
         } catch (err: any) {
           errorLog.push(`${attempt.name}: ${err.message}`);
