@@ -91,6 +91,12 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [showBrandGlows, setShowBrandGlows] = useState(true);
   const [glowIntensity, setGlowIntensity] = useState(35);
 
+  // SELECAO E DRAG DIRETO NO CANVAS (mais controle sem ir no painel direito)
+  const [selectedCanvasEl, setSelectedCanvasEl] = useState<'logo' | 'text' | 'person' | null>(null);
+  const [logoXY, setLogoXY] = useState<{ x: number; y: number } | null>(null);
+  const [personXY, setPersonXY] = useState<{ x: number; y: number } | null>(null);
+  const [textBlockXY, setTextBlockXY] = useState<{ x: number; y: number }>({ x: 50, y: 80 });
+
   // MODO VARIAÇÕES EM MASSA
   const [variationsCount, setVariationsCount] = useState<number>(4);
   const [bulkVariations, setBulkVariations] = useState<string[]>([]);
@@ -823,30 +829,78 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </>
               )}
 
-              {/* CAMADA 4: LOGO DO CLIENTE / MARCA */}
+              {/* CAMADA 4: LOGO DO CLIENTE / MARCA - arrastável e selecionável */}
               {logoImage && (
                 <div
-                  className={`absolute z-30 pointer-events-none p-6 sm:p-8 ${
-                    logoPosition === 'top-left' ? 'top-0 left-0 items-start'
-                    : logoPosition === 'top-center' ? 'top-0 left-1/2 -translate-x-1/2 items-center'
-                    : logoPosition === 'top-right' ? 'top-0 right-0 items-end'
-                    : logoPosition === 'middle-left' ? 'top-1/2 -translate-y-1/2 left-0 items-start'
-                    : logoPosition === 'middle-center' ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 items-center'
-                    : logoPosition === 'middle-right' ? 'top-1/2 right-0 -translate-y-1/2 items-end'
-                    : logoPosition === 'bottom-left' ? 'bottom-0 left-0 items-start'
-                    : logoPosition === 'bottom-center' ? 'bottom-0 left-1/2 -translate-x-1/2 items-center'
-                    : 'bottom-0 right-0 items-end'
-                  } flex`}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedCanvasEl('logo');
+                    const canvas = (e.currentTarget.closest('[id="single-creative-canvas"]') as HTMLElement);
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const startX = e.clientX - rect.left;
+                    const startY = e.clientY - rect.top;
+                    const origX = logoXY
+                      ? (logoXY.x / 100) * rect.width
+                      : logoPosition.includes('left')
+                        ? 0
+                        : logoPosition.includes('right')
+                        ? rect.width
+                        : rect.width / 2;
+                    const origY = logoXY
+                      ? (logoXY.y / 100) * rect.height
+                      : logoPosition.includes('top')
+                        ? 0
+                        : logoPosition.includes('bottom')
+                        ? rect.height
+                        : rect.height / 2;
+
+                    const handleMove = (ev: MouseEvent) => {
+                      const dx = ev.clientX - rect.left - startX;
+                      const dy = ev.clientY - rect.top - startY;
+                      const newX = Math.max(0, Math.min(100, ((origX + dx) / rect.width) * 100));
+                      const newY = Math.max(0, Math.min(100, ((origY + dy) / rect.height) * 100));
+                      setLogoXY({ x: newX, y: newY });
+                    };
+                    const handleUp = () => {
+                      window.removeEventListener('mousemove', handleMove);
+                      window.removeEventListener('mouseup', handleUp);
+                    };
+                    window.addEventListener('mousemove', handleMove);
+                    window.addEventListener('mouseup', handleUp);
+                  }}
+                  className={`absolute z-30 p-6 sm:p-8 cursor-move transition-all ${
+                    selectedCanvasEl === 'logo'
+                      ? 'outline outline-2 outline-emerald-400 outline-offset-[-8px]'
+                      : ''
+                  }`}
+                  style={{
+                    left: logoXY ? `${logoXY.x}%` : (logoPosition.includes('left') ? '0' : logoPosition.includes('right') ? 'auto' : '50%'),
+                    right: !logoXY && logoPosition.includes('right') ? '0' : 'auto',
+                    top: logoXY ? `${logoXY.y}%` : (logoPosition.includes('top') ? '0' : logoPosition.includes('bottom') ? 'auto' : '50%'),
+                    bottom: !logoXY && logoPosition.includes('bottom') ? '0' : 'auto',
+                    transform: logoXY
+                      ? 'translate(-50%, -50%)'
+                      : logoPosition.includes('center')
+                      ? 'translate(-50%, -50%)'
+                      : '',
+                  }}
                 >
                   <img
                     src={logoImage}
                     alt="Logo"
-                    className="object-contain filter drop-shadow-md"
+                    className="object-contain filter drop-shadow-md pointer-events-none"
                     style={{
                       height: `${(logoScale / 100) * 42}px`,
                       maxWidth: '160px',
                     }}
+                    draggable={false}
                   />
+                  {selectedCanvasEl === 'logo' && (
+                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-bold uppercase whitespace-nowrap">
+                      Logo - arraste para mover
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -895,15 +949,63 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
 
-              {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO (com tipografia avancada) */}
+              {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO (arrastável e selecionável) */}
               {showText && (
                 <div
-                  className="relative z-20 w-full h-full p-6 sm:p-10"
-                  style={buildContainerStyle(
-                    { ...headlineConfig, verticalAlign: 'bottom' },
-                    'bottom'
-                  )}
+                  onMouseDown={(e) => {
+                    // Ignora se clicou em input/textarea
+                    if ((e.target as HTMLElement).closest('input, textarea, button')) return;
+                    e.stopPropagation();
+                    setSelectedCanvasEl('text');
+                    const canvas = (e.currentTarget.closest('[id="single-creative-canvas"]') as HTMLElement);
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const startX = e.clientX - rect.left;
+                    const startY = e.clientY - rect.top;
+
+                    const handleMove = (ev: MouseEvent) => {
+                      const dx = ev.clientX - rect.left - startX;
+                      const dy = ev.clientY - rect.top - startY;
+                      setTextBlockXY((prev) => ({
+                        x: Math.max(0, Math.min(100, prev.x + (dx / rect.width) * 100)),
+                        y: Math.max(0, Math.min(100, prev.y + (dy / rect.height) * 100)),
+                      }));
+                    };
+                    const handleUp = () => {
+                      window.removeEventListener('mousemove', handleMove);
+                      window.removeEventListener('mouseup', handleUp);
+                    };
+                    window.addEventListener('mousemove', handleMove);
+                    window.addEventListener('mouseup', handleUp);
+                  }}
+                  className={`relative z-20 w-full h-full p-6 sm:p-10 ${
+                    selectedCanvasEl === 'text' ? 'outline outline-2 outline-emerald-400 outline-offset-[-4px]' : ''
+                  }`}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    ...(selectedCanvasEl === 'text'
+                      ? { cursor: 'move' }
+                      : {}),
+                  }}
                 >
+                  {selectedCanvasEl === 'text' && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-bold uppercase whitespace-nowrap z-50 pointer-events-none">
+                      ✏️ Bloco de Textos - arraste para reposicionar
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      ...buildContainerStyle(
+                        { ...headlineConfig, verticalAlign: 'bottom' },
+                        'bottom'
+                      ),
+                      ...(selectedCanvasEl === 'text' ? { paddingTop: '20px' } : {}),
+                    }}
+                  >
                   {/* TOPO: BARRA SUPERIOR 100% EDITAVEL POR ELEMENTO */}
                   {showTopBar && (
                     <div className={`flex items-center gap-3 flex-wrap self-stretch mb-3 ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}>
@@ -1067,6 +1169,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
                 </div>
               )}
             </div>
