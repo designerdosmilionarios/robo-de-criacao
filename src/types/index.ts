@@ -1,0 +1,68 @@
+export interface BrandKit {
+  id: string;
+  name: string;
+  handle: string; // ex: @designer.studio
+  logoUrl?: string;
+  primaryColor: string; // ex: #10b981
+  secondaryColor: string; // ex: #f59e0b
+  backgroundColor: string; // ex: #0a0b10
+  cardColor: string; // ex: #161822
+  textColor: string; // ex: #ffffff
+  accentTextColor: string; // ex: #94a3b8
+  fontHeadline: string; // ex: 'Inter', 'Montserrat', 'Syne', etc.
+  fontBody: string;
+}
+
+export interface LocalFont {
+  family: string;
+  base64: string;
+  format: string;
+  weight?: string;
+  italic?: boolean;
+}
+
+export type TemplateStyle =
+  | 'minimalist-dark'
+  | 'neo-brutalist'
+  | 'glassmorphism'
+  | 'editorial-luxury'
+  | 'tech-modern';
+
+export interface CarouselSlide {
+  id: string;
+  type: 'cover' | 'content' | 'quote' | 'checklist' | 'cta';
+  tag?: string;
+  title: string;
+  highlightText?: string;
+  subtitle?: string;
+  bodyList?: string[];
+  ctaButton?: string;
+  imageUrl?: string;
+  badge?: string;
+}
+
+export interface CarouselProject {
+  id: string;
+  title: string;
+  brandId: string;
+  aspectRatio: '4:5' | '1:1' | '9:16'; // 4:5 = 1080x1350 (IG Feed), 1:1 = 1080x1080, 9:16 = Stories/Reels
+  templateStyle: TemplateStyle;
+  slides: CarouselSlide[];
+}
+
+export interface AdVariation {
+  id: string;
+  headline: string;
+  subheadline: string;
+  cta: string;
+  tag: string;
+  badge?: string;
+  bgGradient: string;
+}
+
+export interface ApiSettings {
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  falApiKey?: string;
+  provider: 'openai' | 'Opus 4.8';
+}
