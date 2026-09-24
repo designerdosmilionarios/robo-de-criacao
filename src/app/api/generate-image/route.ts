@@ -36,17 +36,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mapeia o formato solicitado para o tamanho mais próximo aceito pelo modelo
+    // Mapeia o formato solicitado para o tamanho mais próximo aceito
     let requestedSize = '1024x1024';
     if (size === '1920x1080' || size === '1792x1024' || size === '1536x1024') {
-      requestedSize = '1536x1024'; // paisagem (gpt-image-1)
+      requestedSize = '1536x1024'; // paisagem
     } else if (size === '1080x1920' || size === '1024x1792' || size === '1024x1536') {
-      requestedSize = '1024x1536'; // retrato (gpt-image-1)
+      requestedSize = '1024x1536'; // retrato
     }
 
     // Lista de modelos para tentar, do melhor/mais novo para o mais antigo
+    // Inclui variantes preview e 1.5 que estão sendo liberadas aos poucos
     const modelAttempts = [
+      { name: 'gpt-image-1.5', size: requestedSize, supportsB64: true },
       { name: 'gpt-image-1', size: requestedSize, supportsB64: true },
+      { name: 'gpt-image-2.5', size: requestedSize, supportsB64: true },
       { name: 'dall-e-3', size: requestedSize === '1024x1536' ? '1024x1792' : requestedSize === '1536x1024' ? '1792x1024' : '1024x1024', supportsB64: false },
       { name: 'dall-e-2', size: '1024x1024', supportsB64: true },
     ];
@@ -120,7 +123,7 @@ export async function POST(req: NextRequest) {
       {
         error:
           lastError ||
-          'Nenhum modelo de imagem da OpenAI está disponível para esta conta. Tente usar a chave do Opus 4.8 (Anthropic) ou verifique os créditos em platform.openai.com.',
+          'Nenhum modelo de imagem da OpenAI está disponível para esta conta. Sua chave parece não ter acesso a GPT Image ou DALL-E. Tente usar o Opus 4.8 (Anthropic) no seletor superior.',
       },
       { status: 502 }
     );
