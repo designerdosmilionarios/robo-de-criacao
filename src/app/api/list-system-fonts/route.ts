@@ -72,8 +72,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Limitar para evitar timeout e exceder quota do navegador
-    const MAX_FONTS = 80;
+    // Limite aumentado para suportar todas as fontes do Windows + fontes extras do usuario
+    // Agora usando IndexedDB no frontend (limite 50MB-1GB), nao precisa mais restringir
+    const MAX_FONTS = 500;
     const limited = files.slice(0, MAX_FONTS);
     const truncated = files.length > MAX_FONTS;
 
@@ -86,6 +87,8 @@ export async function GET(req: NextRequest) {
       base64: string;
       sizeKB: number;
     }> = [];
+    let skippedCount = 0;
+    let skippedFiles: string[] = [];
 
     for (const fullPath of limited) {
       try {
@@ -101,8 +104,12 @@ export async function GET(req: NextRequest) {
           base64,
           sizeKB: Math.round(buffer.length / 1024),
         });
-      } catch (e) {
-        // Pula arquivo que não pôde ser lido
+      } catch (e: any) {
+        // Pula arquivos que nao puderam ser lidos (permissao negada, arquivo corrompido, etc)
+        skippedCount++;
+        if (skippedFiles.length < 5) {
+          skippedFiles.push(`${path.basename(fullPath)} (${e.code || e.message?.substring(0, 50) || 'erro'})`);
+        }
         continue;
       }
     }
@@ -112,6 +119,8 @@ export async function GET(req: NextRequest) {
       count: fonts.length,
       totalFound: files.length,
       truncated,
+      skipped: skippedCount,
+      skippedFiles,
       fonts,
     });
   } catch (error: any) {
