@@ -200,16 +200,38 @@ export async function migrateFontsFromLocalStorage(): Promise<number> {
 // ESTATISTICAS DE USO
 // =============================
 
-export async function getStorageStats(): Promise<{ fontCount: number; totalBytes: number; estimatedLimitMB: number }> {
+export async function getStorageStats(): Promise<{
+  fontCount: number;
+  totalBytes: number;
+  estimatedLimitMB: number;
+  remainingMB: number;
+  usedPercent: number;
+}> {
   try {
     const fonts = await idbGetAll<StoredFont>(STORE_FONTS);
     const totalBytes = fonts.reduce((sum, f) => sum + (f.base64?.length || 0) * 0.75, 0);
+    // Tenta descobrir o limite real via Storage Manager API (moderna, suportada no Chrome)
+    let estimatedLimitMB = 200; // padrao conservador para IndexedDB
+    try {
+      if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+        const est = await navigator.storage.estimate();
+        if (est.quota) {
+          estimatedLimitMB = Math.floor(est.quota / (1024 * 1024));
+        }
+      }
+    } catch {
+      // ignora, usa valor padrao
+    }
+    const remainingMB = Math.max(0, estimatedLimitMB - totalBytes / (1024 * 1024));
+    const usedPercent = estimatedLimitMB > 0 ? Math.min(100, Math.round((totalBytes / (1024 * 1024) / estimatedLimitMB * 100)) : 0;
     return {
       fontCount: fonts.length,
       totalBytes,
-      estimatedLimitMB: 50, // Chrome tipicamente permite ate ~60MB por origem
+      estimatedLimitMB,
+      remainingMB,
+      usedPercent,
     };
   } catch {
-    return { fontCount: 0, totalBytes: 0, estimatedLimitMB: 50 };
+    return { fontCount: 0, totalBytes: 0, estimatedLimitMB: 200, remainingMB: 200, usedPercent: 0 };
   }
 }

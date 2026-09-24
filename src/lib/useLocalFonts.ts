@@ -13,7 +13,13 @@ export function useLocalFonts() {
   const [fonts, setFonts] = useState<LocalFont[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [migratedCount, setMigratedCount] = useState(0);
-  const [storageStats, setStorageStats] = useState({ fontCount: 0, totalBytes: 0, estimatedLimitMB: 50 });
+  const [storageStats, setStorageStats] = useState({
+    fontCount: 0,
+    totalBytes: 0,
+    estimatedLimitMB: 200,
+    remainingMB: 200,
+    usedPercent: 0,
+  });
 
   // Carregar fontes do IndexedDB ao montar (com migracao do localStorage)
   useEffect(() => {

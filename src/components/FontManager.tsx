@@ -32,10 +32,18 @@ interface FontManagerProps {
   onRemoveFont: (family: string) => void;
   activeFont: string;
   onSelectFont: (family: string) => void;
+  storageStats?: {
+    fontCount: number;
+    totalBytes: number;
+    estimatedLimitMB: number;
+    remainingMB: number;
+    usedPercent: number;
+  };
 }
 
 // Estima o tamanho de cada fonte em KB (base64 inflates ~33%)
 const estimateSize = (b64: string) => Math.round((b64.length * 0.75) / 1024);
+const bytesToMB = (b: number) => (b / (1024 * 1024)).toFixed(1);
 
 export const FontManager: React.FC<FontManagerProps> = ({
   isOpen,
@@ -45,6 +53,7 @@ export const FontManager: React.FC<FontManagerProps> = ({
   onRemoveFont,
   activeFont,
   onSelectFont,
+  storageStats,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,13 +73,26 @@ export const FontManager: React.FC<FontManagerProps> = ({
   // ESTADO DE BUSCA
   const [fontSearch, setFontSearch] = useState('');
 
-  // ESTATÍSTICAS
+  // ESTATÍSTICAS - usa storageStats real (IndexedDB) se disponivel, senao calcula local
   const stats = useMemo(() => {
-    const totalKB = localFonts.reduce((sum, f) => sum + estimateSize(f.base64), 0);
-    // Limite seguro do localStorage ~5MB = 5120KB
-    const usedPercent = Math.min(100, Math.round((totalKB / 5120) * 100));
-    return { totalKB, usedPercent };
-  }, [localFonts]);
+    if (storageStats) {
+      return {
+        usedMB: storageStats.totalBytes / (1024 * 1024),
+        limitMB: storageStats.estimatedLimitMB,
+        remainingMB: storageStats.remainingMB,
+        usedPercent: storageStats.usedPercent,
+      };
+    }
+    // Fallback (caso nao passe storageStats)
+    const totalBytes = localFonts.reduce((sum, f) => sum + (f.base64?.length || 0) * 0.75, 0);
+    const usedMB = totalBytes / (1024 * 1024);
+    return {
+      usedMB,
+      limitMB: 200,
+      remainingMB: Math.max(0, 200 - usedMB),
+      usedPercent: Math.min(100, Math.round((usedMB / 200) * 100)),
+    };
+  }, [localFonts, storageStats]);
 
   // Detecção automática do tamanho da fonte importada
   const detectFormat = (filename: string): string => {
@@ -304,14 +326,14 @@ export const FontManager: React.FC<FontManagerProps> = ({
           </button>
         </div>
 
-        {/* ESTATÍSTICAS DE USO */}
+        {/* ESTATÍSTICAS DE USO - IndexedDB */}
         <div className="mb-4 p-3 rounded-2xl bg-white/[0.02] border border-white/5">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              💾 Armazenamento Usado
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+              💾 Armazenamento (IndexedDB)
             </span>
             <span className="text-[11px] font-mono font-bold text-white">
-              {stats.totalKB} KB / ~5.120 KB ({stats.usedPercent}%)
+              {stats.usedMB.toFixed(1)} MB / ~{stats.limitMB} MB ({stats.usedPercent}%)
             </span>
           </div>
           <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -325,7 +347,7 @@ export const FontManager: React.FC<FontManagerProps> = ({
           </div>
           <p className="text-[10px] text-gray-500 mt-1.5">
             {localFonts.length} {localFonts.length === 1 ? 'fonte importada' : 'fontes importadas'}.
-            {stats.usedPercent > 80 && ' ⚠️ Próximo do limite — remova fontes antigas para liberar espaço.'}
+            {' '}Restam <strong className="text-emerald-400">~{stats.remainingMB.toFixed(0)} MB</strong> disponíveis.
           </p>
         </div>
 

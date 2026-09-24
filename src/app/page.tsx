@@ -768,6 +768,7 @@ export default function Home() {
         onAddFont={handleAddLocalFont}
         onRemoveFont={handleRemoveLocalFont}
         activeFont={activeBrand.fontHeadline}
+        storageStats={fontStorageStats}
         onSelectFont={(family) => {
           setBrands((prev) =>
             prev.map((b) => (b.id === activeBrandId ? { ...b, fontHeadline: family, fontBody: family } : b))
