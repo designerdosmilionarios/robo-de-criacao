@@ -46,8 +46,8 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ecommerce');
   const [selectedStyle, setSelectedStyle] = useState<string>('premium');
-  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
-  const [expandedCopyType, setExpandedCopyType] = useState<string | null>(null);
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>('prompts');
+  const [expandedCopyType, setExpandedCopyType] = useState<string | null>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const category = CREATIVE_CATEGORIES.find((c) => c.id === selectedCategory);

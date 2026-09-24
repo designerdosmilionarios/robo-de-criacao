@@ -611,7 +611,20 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     const el = document.getElementById('single-creative-canvas');
     if (!el) return;
     try {
+      // Temporariamente ajusta o background para o download (caso o user tenha escolhido cor solida ou degradê)
+      const originalBg = (el as HTMLElement).style.backgroundColor;
+      if (useGradient && !bgImage) {
+        (el as HTMLElement).style.backgroundColor =
+          `linear-gradient(${gradientAngle}deg, ${gradientColor1} 0%, ${gradientColor2} 100%)`;
+      } else if (!bgImage) {
+        (el as HTMLElement).style.backgroundColor = gradientColor1;
+      }
+
       const dataUrl = await toPng(el, { pixelRatio: 2, cacheBust: true });
+
+      // Restaura o background cinza de visualização
+      (el as HTMLElement).style.backgroundColor = originalBg;
+
       saveAs(
         dataUrl,
         `${brand.name.toLowerCase().replace(/\s+/g, '-')}-criativo-${format.replace(':', 'x')}.png`
@@ -655,16 +668,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       </div>
 
       {/* ÁREA PRINCIPAL: CANVAS (COLUNA ESQUERDA) + CONTROLES (COLUNA DIREITA) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* COLUNA ESQUERDA: CANVAS PREVIEW (7 COLS) */}
-        <div className="lg:col-span-7 flex flex-col items-center">
-          <div className="w-full max-w-[540px]">
-            {/* O CANVAS RENDERIZADO */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* COLUNA ESQUERDA: CANVAS PREVIEW (8 COLS - maior para melhor visualizacao) */}
+        <div className="xl:col-span-8 flex flex-col items-center">
+          <div className="w-full max-w-[680px]">
+            {/* O CANVAS RENDERIZADO - com background cinza claro para visualização real */}
             <div
               id="single-creative-canvas"
-              className={`relative w-full ${currentFormat.className} overflow-hidden rounded-2xl shadow-2xl border border-white/15 select-none`}
+              className={`relative w-full ${currentFormat.className} overflow-hidden rounded-2xl shadow-2xl border-2 border-white/20 select-none`}
               style={{
-                backgroundColor: 'transparent', // Deixa o degradê/imagem controlada pelo usuário
+                backgroundColor: '#f0f0f0', // Fundo cinza para visualização real (contraste com a página escura)
                 color: brand.textColor,
                 fontFamily: brand.fontBody,
               }}
@@ -986,8 +999,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
         </div>
 
-        {/* COLUNA DIREITA: PAINEL DE EDIÇÃO (5 COLS) */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* COLUNA DIREITA: PAINEL DE EDIÇÃO (4 COLS - sticky para acompanhar scroll longo) */}
+        <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:pr-2">
           {/* SEÇÃO 1: LOGO DO CLIENTE */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
