@@ -97,6 +97,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [personXY, setPersonXY] = useState<{ x: number; y: number } | null>(null);
   const [textBlockXY, setTextBlockXY] = useState<{ x: number; y: number }>({ x: 50, y: 80 });
 
+  // Posicao X/Y individual para cada texto (em %)
+  const [tagPos, setTagPos] = useState<{ x: number; y: number } | null>(null);
+  const [headlinePos, setHeadlinePos] = useState<{ x: number; y: number } | null>(null);
+
   // MODO VARIAÇÕES EM MASSA
   const [variationsCount, setVariationsCount] = useState<number>(4);
   const [bulkVariations, setBulkVariations] = useState<string[]>([]);
@@ -956,9 +960,18 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       ...(selectedCanvasEl === 'text' ? { paddingTop: '20px' } : {}),
                     }}
                   >
-                  {/* TOPO: BARRA SUPERIOR 100% EDITAVEL POR ELEMENTO */}
+                  {/* TOPO: BARRA SUPERIOR 100% EDITAVEL POR ELEMENTO COM POSICAO X/Y */}
                   {showTopBar && (
-                    <div className={`flex items-center gap-3 flex-wrap self-stretch mb-3 ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}>
+                    <div
+                      className={`flex items-center gap-3 flex-wrap self-stretch mb-3 ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}
+                      style={{
+                        position: tagPos ? 'absolute' : 'static',
+                        left: tagPos ? `${tagPos.x}%` : undefined,
+                        top: tagPos ? `${tagPos.y}%` : undefined,
+                        transform: tagPos ? 'translate(-50%, -50%)' : undefined,
+                        zIndex: tagPos ? 20 : undefined,
+                      }}
+                    >
                       {/* TAG com tipografia customizada */}
                       {showTag && tag && tagConfig.visible && (
                         <span
@@ -1006,12 +1019,18 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     </div>
                   )}
 
-                  {/* MEIO/BASE: TEXTOS PRINCIPAIS */}
+                  {/* MEIO/BASE: TEXTOS PRINCIPAIS - com posicao X/Y via sliders */}
                   <div
                     className={`flex flex-col w-full ${
                       personPosition === 'right' && textAlignment === 'left' ? 'max-w-[62%]' : 'max-w-full'
                     }`}
                     style={{
+                      position: headlinePos ? 'absolute' : 'static',
+                      left: headlinePos ? `${headlinePos.x}%` : undefined,
+                      top: headlinePos ? `${headlinePos.y}%` : undefined,
+                      transform: headlinePos ? 'translate(-50%, -50%)' : undefined,
+                      maxWidth: headlinePos ? '500px' : undefined,
+                      width: headlinePos ? '90%' : undefined,
                       gap: `${headlineConfig.lineHeight * 0.7}em`,
                       textAlign: headlineConfig.textAlign,
                       alignItems:
@@ -1198,6 +1217,39 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   >
                     Trocar
                   </button>
+                </div>
+
+                {/* SEÇÃO: POSIÇÃO DOS TEXTOS (X/Y) */}
+                <div className="pt-3 border-t border-white/5 space-y-3">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    📍 Posição dos Textos no Canvas
+                  </h4>
+
+                  {showTag && tag && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-amber-300 uppercase">Tag</span>
+                        <button onClick={() => setTagPos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(tagPos?.x ?? 5)}%</span></div>
+                      <input type="range" min="0" max="100" value={tagPos?.x ?? 5} onChange={(e) => setTagPos((p) => ({ x: Number(e.target.value), y: p?.y ?? 5 }))} className="w-full accent-amber-500" />
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(tagPos?.y ?? 5)}%</span></div>
+                      <input type="range" min="0" max="100" value={tagPos?.y ?? 5} onChange={(e) => setTagPos((p) => ({ x: p?.x ?? 5, y: Number(e.target.value) }))} className="w-full accent-amber-500" />
+                    </div>
+                  )}
+
+                  {headlineConfig.visible && headline && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-emerald-300 uppercase">Bloco de Textos</span>
+                        <button onClick={() => setHeadlinePos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(headlinePos?.x ?? 50)}%</span></div>
+                      <input type="range" min="0" max="100" value={headlinePos?.x ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 80 }))} className="w-full accent-emerald-500" />
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(headlinePos?.y ?? 80)}%</span></div>
+                      <input type="range" min="0" max="100" value={headlinePos?.y ?? 80} onChange={(e) => setHeadlinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-emerald-500" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Posição do Logo - Grid 3x3 + Slider livre X/Y */}
