@@ -36,6 +36,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   const [imagePrompt, setImagePrompt] = useState('');
   const [isGeneratingImg, setIsGeneratingImg] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
 
   const handleGenerateAiImage = async () => {
     if (!apiKey) {
@@ -60,6 +61,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           size: '1024x1024',
           aspectRatio: '1:1',
           provider: 'openai',
+          preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
         }),
       });
       const data = await res.json();
@@ -272,6 +274,24 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               )}
             </button>
           </div>
+
+          {/* Seletor de modelo */}
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-[11px] font-semibold focus:border-brand-500 focus:outline-none"
+          >
+            <option value="auto" className="bg-[#11131a]">⭐ Auto (melhor → mais barato)</option>
+            <option value="gpt-image-2.5-sunburst" className="bg-[#11131a]">💎 gpt-image-2.5-sunburst (Premium)</option>
+            <option value="gpt-image-2.5-flare" className="bg-[#11131a]">⚡ gpt-image-2.5-flare (Rápido)</option>
+            <option value="gpt-image-2.5" className="bg-[#11131a]">🔷 gpt-image-2.5</option>
+            <option value="gpt-image-2" className="bg-[#11131a]">🆕 gpt-image-2</option>
+            <option value="gpt-image-1.5" className="bg-[#11131a]">🌟 gpt-image-1.5</option>
+            <option value="gpt-image-1" className="bg-[#11131a]">✨ gpt-image-1 (Recomendado)</option>
+            <option value="gpt-image-1-mini" className="bg-[#11131a]">💰 gpt-image-1-mini (Econômico)</option>
+            <option value="dall-e-3" className="bg-[#11131a]">🎨 DALL-E 3</option>
+            <option value="dall-e-2" className="bg-[#11131a]">🏷️ DALL-E 2</option>
+          </select>
 
           {imgError && (
             <p className="text-[11px] text-red-400 font-medium">{imgError}</p>

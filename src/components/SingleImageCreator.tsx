@@ -67,12 +67,23 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
   const [selectedModel, setSelectedModel] = useState<string>('auto');
 
+  // Degradê customizado do background (cor sólida quando bgImage é null)
+  const [useGradient, setUseGradient] = useState(true);
+  const [gradientColor1, setGradientColor1] = useState('#0a1f1a');
+  const [gradientColor2, setGradientColor2] = useState('#0a0b10');
+  const [gradientAngle, setGradientAngle] = useState(135);
+  const [gradientOpacity, setGradientOpacity] = useState(100);
+
   // Imagem de Referência para a IA guiar o estilo
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
   // Logo da Marca
   const [logoImage, setLogoImage] = useState<string | null>(brand.logoUrl || null);
-  const [logoPosition, setLogoPosition] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-left');
+  const [logoPosition, setLogoPosition] = useState<
+    'top-left' | 'top-center' | 'top-right' |
+    'middle-left' | 'middle-center' | 'middle-right' |
+    'bottom-left' | 'bottom-center' | 'bottom-right'
+  >('top-left');
   const [logoScale, setLogoScale] = useState<number>(100);
 
   // Imagem de Pessoa Real
@@ -126,6 +137,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         logoImage,
         logoPosition,
         logoScale,
+        useGradient,
+        gradientColor1,
+        gradientColor2,
+        gradientAngle,
+        gradientOpacity,
         personImage,
         personPosition,
         personScale,
@@ -158,6 +174,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if ('logoImage' in data) setLogoImage(data.logoImage);
         if (data.logoPosition) setLogoPosition(data.logoPosition);
         if (typeof data.logoScale === 'number') setLogoScale(data.logoScale);
+        if (typeof data.useGradient === 'boolean') setUseGradient(data.useGradient);
+        if (typeof data.gradientColor1 === 'string') setGradientColor1(data.gradientColor1);
+        if (typeof data.gradientColor2 === 'string') setGradientColor2(data.gradientColor2);
+        if (typeof data.gradientAngle === 'number') setGradientAngle(data.gradientAngle);
+        if (typeof data.gradientOpacity === 'number') setGradientOpacity(data.gradientOpacity);
         if ('personImage' in data) setPersonImage(data.personImage);
         if (data.personPosition) setPersonPosition(data.personPosition);
         if (typeof data.personScale === 'number') setPersonScale(data.personScale);
@@ -192,6 +213,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     logoImage,
     logoPosition,
     logoScale,
+    useGradient,
+    gradientColor1,
+    gradientColor2,
+    gradientAngle,
+    gradientOpacity,
     personImage,
     personPosition,
     personScale,
@@ -405,7 +431,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 <div
                   className="absolute inset-0"
                   style={{
-                    background: `radial-gradient(circle at 50% 20%, ${brand.cardColor} 0%, ${brand.backgroundColor} 100%)`,
+                    background: useGradient
+                      ? `linear-gradient(${gradientAngle}deg, ${gradientColor1} 0%, ${gradientColor2} 100%)`
+                      : gradientColor1,
+                    opacity: gradientOpacity / 100,
                   }}
                 />
               )}
@@ -435,14 +464,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               {logoImage && (
                 <div
                   className={`absolute z-30 pointer-events-none p-6 sm:p-8 ${
-                    logoPosition === 'top-left'
-                      ? 'top-0 left-0'
-                      : logoPosition === 'top-right'
-                      ? 'top-0 right-0'
-                      : logoPosition === 'bottom-left'
-                      ? 'bottom-0 left-0'
-                      : 'bottom-0 right-0'
-                  }`}
+                    logoPosition === 'top-left' ? 'top-0 left-0 items-start'
+                    : logoPosition === 'top-center' ? 'top-0 left-1/2 -translate-x-1/2 items-center'
+                    : logoPosition === 'top-right' ? 'top-0 right-0 items-end'
+                    : logoPosition === 'middle-left' ? 'top-1/2 -translate-y-1/2 left-0 items-start'
+                    : logoPosition === 'middle-center' ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 items-center'
+                    : logoPosition === 'middle-right' ? 'top-1/2 right-0 -translate-y-1/2 items-end'
+                    : logoPosition === 'bottom-left' ? 'bottom-0 left-0 items-start'
+                    : logoPosition === 'bottom-center' ? 'bottom-0 left-1/2 -translate-x-1/2 items-center'
+                    : 'bottom-0 right-0 items-end'
+                  } flex`}
                 >
                   <img
                     src={logoImage}
@@ -694,20 +725,25 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   </button>
                 </div>
 
-                {/* Posição do Logo */}
+                {/* Posição do Logo - 9 opcoes (grid 3x3) */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-gray-400 mb-1">Posição no Criativo</label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <label className="block text-[11px] font-semibold text-gray-400 mb-1">Posição do Logo (9 opções)</label>
+                  <div className="grid grid-cols-3 gap-1.5">
                     {[
-                      { id: 'top-left', label: 'Superior Esquerdo' },
-                      { id: 'top-right', label: 'Superior Direito' },
-                      { id: 'bottom-left', label: 'Inferior Esquerdo' },
-                      { id: 'bottom-right', label: 'Inferior Direito' },
+                      { id: 'top-left', label: '↖ Sup Esq' },
+                      { id: 'top-center', label: '↑ Topo Centro' },
+                      { id: 'top-right', label: '↗ Sup Dir' },
+                      { id: 'middle-left', label: '← Meio Esq' },
+                      { id: 'middle-center', label: '● Centro' },
+                      { id: 'middle-right', label: '→ Meio Dir' },
+                      { id: 'bottom-left', label: '↙ Inf Esq' },
+                      { id: 'bottom-center', label: '↓ Base Centro' },
+                      { id: 'bottom-right', label: '↘ Inf Dir' },
                     ].map((pos) => (
                       <button
                         key={pos.id}
                         onClick={() => setLogoPosition(pos.id as any)}
-                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all ${
+                        className={`py-1.5 px-1 rounded-lg text-[10px] font-semibold border transition-all ${
                           logoPosition === pos.id
                             ? 'bg-amber-400/20 border-amber-400 text-amber-300'
                             : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
@@ -794,7 +830,111 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             )}
           </div>
 
-          {/* SEÇÃO 3: PESSOA REAL */}
+          {/* SEÇÃO 3: DEGRADÊ DO FUNDO */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Palette size={16} className="text-emerald-400" /> Degradê / Fundo Sólido
+              </h3>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useGradient}
+                  onChange={(e) => setUseGradient(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-500"
+                />
+                <span className="text-[11px] text-gray-300 font-semibold">{useGradient ? 'Degradê' : 'Cor sólida'}</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor 1</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={gradientColor1}
+                    onChange={(e) => setGradientColor1(e.target.value)}
+                    className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={gradientColor1}
+                    onChange={(e) => setGradientColor1(e.target.value)}
+                    className="flex-1 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-[11px] font-mono focus:border-brand-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              {useGradient && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor 2</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={gradientColor2}
+                      onChange={(e) => setGradientColor2(e.target.value)}
+                      className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={gradientColor2}
+                      onChange={(e) => setGradientColor2(e.target.value)}
+                      className="flex-1 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-[11px] font-mono focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {useGradient && (
+              <div>
+                <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mb-1">
+                  <span>Ângulo do Degradê</span>
+                  <span>{gradientAngle}°</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="360"
+                  step="15"
+                  value={gradientAngle}
+                  onChange={(e) => setGradientAngle(Number(e.target.value))}
+                  className="w-full accent-emerald-500"
+                />
+                <div className="grid grid-cols-4 gap-1 mt-1.5">
+                  {[0, 90, 135, 180, 225, 270, 315, 360].slice(0, 4).map((a) => (
+                    <button
+                      key={a}
+                      onClick={() => setGradientAngle(a)}
+                      className="py-0.5 text-[10px] bg-white/5 hover:bg-white/10 rounded border border-white/5 text-gray-400 hover:text-white transition-colors"
+                    >
+                      {a}°
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mb-1">
+                <span>Opacidade do Fundo</span>
+                <span>{gradientOpacity}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={gradientOpacity}
+                onChange={(e) => setGradientOpacity(Number(e.target.value))}
+                className="w-full accent-emerald-500"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Use o degradê para preencher enquanto a IA gera a imagem, ou baixe com 100% opacidade.
+              </p>
+            </div>
+          </div>
+
+          {/* SEÇÃO 4: PESSOA REAL */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">

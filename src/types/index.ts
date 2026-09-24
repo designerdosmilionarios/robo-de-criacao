@@ -96,8 +96,17 @@ export interface SavedSingleImageData {
   bgImage: string | null;
   referenceImage: string | null;
   logoImage: string | null;
-  logoPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  logoPosition:
+    | 'top-left' | 'top-center' | 'top-right'
+    | 'middle-left' | 'middle-center' | 'middle-right'
+    | 'bottom-left' | 'bottom-center' | 'bottom-right';
   logoScale: number;
+  // Degradê customizado do background
+  gradientColor1: string;
+  gradientColor2: string;
+  gradientAngle: number;
+  gradientOpacity: number;
+  useGradient: boolean;
   personImage: string | null;
   personPosition: 'right' | 'left' | 'center';
   personScale: number;
