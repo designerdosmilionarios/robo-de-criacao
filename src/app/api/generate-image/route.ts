@@ -4,23 +4,37 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Endpoint dedicado OpenAI / ChatGPT.
-// Suporta os modelos mais recentes da OpenAI Platform:
+// Suporta os modelos da OpenAI Platform:
 // gpt-image-2.5, gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3, dall-e-2.
 // Tambem faz fallback automatico para Opus 4.8 Opus 4.8 Studio se a chave comecar com "AIza".
 
-async function tryOpenAI(key: string, prompt: string, size: string) {
+async function tryOpenAI(key: string, prompt: string, size: string, model: string) {
+  // gpt-image-* models nao aceitam parametro "size" nem "quality"
+  const isGptImage = model.startsWith('gpt-image');
+
+  const body: any = {
+    model,
+    prompt,
+    n: 1,
+  };
+
+  if (isGptImage) {
+    // gpt-image-1 aceita apenas 1024x1024, 1024x1536, 1536x1024 (auto)
+    // gpt-image-2.5 sunburst/flare tambem aceitam esses tamanhos
+    body.size = size === '1792x1024' ? '1536x1024' : size === '1024x1792' ? '1024x1536' : size;
+  } else {
+    // dall-e aceita tamanhos especificos
+    body.size = size;
+    body.quality = 'standard';
+  }
+
   const response = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${key.trim()}`,
     },
-    body: JSON.stringify({
-      model: 'dall-e-3',
-      prompt,
-      n: 1,
-      size,
-    }),
+    body: JSON.stringify(body),
   });
   return response;
 }
@@ -158,13 +172,13 @@ export async function POST(req: NextRequest) {
       else if (size === '1080x1920' || size === '1024x1792') requestedSize = '1024x1792';
 
       const modelAttempts = [
+        { name: 'gpt-image-1', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-1.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-1-mini', size: '1024x1024' },
         { name: 'gpt-image-2.5-sunburst', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
         { name: 'gpt-image-2.5-flare', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
         { name: 'gpt-image-2.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
         { name: 'gpt-image-2', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-1.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-1', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-1-mini', size: '1024x1024' },
         { name: 'chatgpt-image-latest', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
         { name: 'dall-e-3', size: requestedSize },
         { name: 'dall-e-2', size: '1024x1024' },
@@ -173,7 +187,7 @@ export async function POST(req: NextRequest) {
       const errorLog: string[] = [];
       for (const attempt of modelAttempts) {
         try {
-          const response = await tryOpenAI(key, finalPrompt, attempt.size);
+          const response = await tryOpenAI(key, finalPrompt, attempt.size, attempt.name);
           const data = await response.json();
 
           if (!response.ok) {
