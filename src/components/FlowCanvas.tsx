@@ -11,14 +11,16 @@ import {
   Upload,
   X,
   ChevronRight,
-  Save,
   Copy,
+  Download,
   Loader2,
   Check,
   Zap,
   Hash,
 } from 'lucide-react';
 import { optimizeImageDataUrl } from '@/lib/imageData';
+import { toPng } from 'html-to-image';
+import saveAs from 'file-saver';
 
 // Tipos de blocos disponiveis no canvas
 export type BlockType =
@@ -122,6 +124,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
+  const [creativeText, setCreativeText] = useState({ headline: '', support: '', cta: '' });
+  const [downloadingPreview, setDownloadingPreview] = useState<number | null>(null);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -261,6 +265,30 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     window.setTimeout(() => setConnectionMessage(null), 2500);
   };
 
+  const useCopyInCreative = (copy: string) => {
+    const [headline = '', support = '', cta = ''] = copy
+      .split('|')
+      .map((part) => part.trim());
+    setCreativeText({ headline, support, cta });
+  };
+
+  const handleDownloadPreview = async (index: number) => {
+    const preview = document.getElementById(`flow-creative-preview-${index}`);
+    if (!preview) return;
+    setDownloadingPreview(index);
+    try {
+      const dataUrl = await toPng(preview, {
+        pixelRatio: 1,
+        canvasWidth: 1080,
+        canvasHeight: 1080,
+        cacheBust: true,
+      });
+      saveAs(dataUrl, `criativo-esteira-${index + 1}.png`);
+    } finally {
+      setDownloadingPreview(null);
+    }
+  };
+
   // Gerar saida de um bloco (executa o flow)
   const handleGenerate = async (blockId: string) => {
     const block = blocks.find((b) => b.id === blockId);
@@ -294,6 +322,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       if (block.type === 'copy-output') {
         // Gerar 4 variacoes de copy via Mestre dos Prompts
         const variations = await generateCopyVariations(briefing, style, apiKey);
+        if (variations[0]) useCopyInCreative(variations[0]);
         setBlocks((prev) =>
           prev.map((b): FlowBlock => (b.id === blockId ? { ...b, output: variations } : b))
         );
@@ -384,6 +413,43 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             <Hash size={12} /> 4 Variações
           </button>
         </div>
+      </div>
+
+      <div className="grid gap-2 p-3 border-b border-white/10 bg-[#0b0d14] sm:grid-cols-[auto_1fr_1fr_0.7fr] sm:items-end">
+        <div className="sm:pb-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-white">Textos do criativo</p>
+          <p className="text-[9px] text-gray-500">Edite aqui ou gere uma copy para preencher.</p>
+        </div>
+        <label className="space-y-1">
+          <span className="block text-[9px] font-bold uppercase text-gray-500">Headline</span>
+          <input
+            aria-label="Headline do criativo"
+            value={creativeText.headline}
+            onChange={(event) => setCreativeText((current) => ({ ...current, headline: event.target.value }))}
+            placeholder="Título principal"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none focus:border-emerald-400"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="block text-[9px] font-bold uppercase text-gray-500">Destaque</span>
+          <input
+            aria-label="Destaque do criativo"
+            value={creativeText.support}
+            onChange={(event) => setCreativeText((current) => ({ ...current, support: event.target.value }))}
+            placeholder="Complemento da mensagem"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none focus:border-emerald-400"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="block text-[9px] font-bold uppercase text-gray-500">CTA</span>
+          <input
+            aria-label="CTA do criativo"
+            value={creativeText.cta}
+            onChange={(event) => setCreativeText((current) => ({ ...current, cta: event.target.value }))}
+            placeholder="Saiba mais"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none focus:border-emerald-400"
+          />
+        </label>
       </div>
 
       {/* AREA DO CANVAS (meio) */}
@@ -680,7 +746,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                 )}
 
                 {isOutput && (
-                  <div className="min-h-[60px] flex items-center justify-center bg-black/20 rounded-md">
+                  <div className="min-h-[60px] flex flex-col items-center justify-center bg-black/20 rounded-md">
                     {generating === block.id ? (
                       <div className="flex flex-col items-center gap-1 py-2">
                         <Loader2 size={18} className={`${config.color} animate-spin`} />
@@ -708,6 +774,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                       </div>
                     ) : (
                       <span className="text-[9px] text-gray-500 italic">Sem output</span>
+                    )}
+                    {block.output && !generating && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setOutputModal({ blockId: block.id, output: block.output });
+                        }}
+                        className="m-1.5 w-[calc(100%-0.75rem)] rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-bold text-white hover:bg-white/10"
+                      >
+                        Visualizar resultado
+                      </button>
                     )}
                   </div>
                 )}
@@ -767,19 +844,72 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             {Array.isArray(outputModal.output) ? (
               <div className="grid grid-cols-2 gap-3">
                 {outputModal.output.map((out: any, i: number) => (
-                  <div key={i} className="rounded-xl border border-white/10 overflow-hidden">
+                  <div key={i} className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
                     {typeof out === 'string' && out.startsWith('data:image') ? (
-                          <img src={out} alt={`Resultado ${i + 1}`} className="w-full" />
-                        ) : (
-                          <div className="p-3 bg-black/30">
-                            <p className="text-xs text-gray-300">{typeof out === 'string' ? out : JSON.stringify(out, null, 2)}</p>
+                      <>
+                        <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
+                          <img src={out} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+                          <div className="absolute inset-x-0 bottom-0 space-y-2 p-5 text-left">
+                            {creativeText.headline && <h4 className="text-2xl font-black uppercase leading-[0.95] text-white drop-shadow-lg">{creativeText.headline}</h4>}
+                            {creativeText.support && <p className="max-w-[90%] text-sm font-medium leading-tight text-white/90">{creativeText.support}</p>}
+                            {creativeText.cta && <span className="inline-flex rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black uppercase text-black">{creativeText.cta}</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDownloadPreview(i)}
+                          disabled={downloadingPreview === i}
+                          className="flex w-full items-center justify-center gap-2 border-t border-white/10 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                        >
+                          {downloadingPreview === i ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                          Baixar PNG
+                        </button>
+                      </>
+                    ) : (
+                      <div className="space-y-3 p-3 bg-black/30">
+                        <p className="text-xs text-gray-300">{typeof out === 'string' ? out : JSON.stringify(out, null, 2)}</p>
+                        {typeof out === 'string' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => useCopyInCreative(out)}
+                              className="flex-1 rounded-md bg-amber-400 px-2 py-1.5 text-[10px] font-black text-black hover:bg-amber-300"
+                            >
+                              Usar esta copy
+                            </button>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(out)}
+                              aria-label="Copiar texto"
+                              className="rounded-md border border-white/10 px-2 text-gray-300 hover:bg-white/10"
+                            >
+                              <Copy size={12} />
+                            </button>
                           </div>
                         )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             ) : typeof outputModal.output === 'string' && outputModal.output.startsWith('data:image') ? (
-              <img src={outputModal.output} alt="Resultado" className="w-full" />
+              <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+                <div id="flow-creative-preview-0" className="relative aspect-square overflow-hidden bg-black">
+                  <img src={outputModal.output} alt="Resultado" className="absolute inset-0 h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 space-y-3 p-7 text-left">
+                    {creativeText.headline && <h4 className="text-4xl font-black uppercase leading-[0.95] text-white drop-shadow-lg">{creativeText.headline}</h4>}
+                    {creativeText.support && <p className="max-w-[90%] text-base font-medium leading-tight text-white/90">{creativeText.support}</p>}
+                    {creativeText.cta && <span className="inline-flex rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black uppercase text-black">{creativeText.cta}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDownloadPreview(0)}
+                  disabled={downloadingPreview === 0}
+                  className="flex w-full items-center justify-center gap-2 border-t border-white/10 px-4 py-3 text-sm font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                >
+                  {downloadingPreview === 0 ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  Baixar criativo em PNG
+                </button>
+              </div>
             ) : (
               <p className="text-sm text-gray-300">{outputModal.output as string}</p>
             )}
