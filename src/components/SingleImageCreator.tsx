@@ -64,6 +64,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [isGeneratingBg, setIsGeneratingBg] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
+  // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
 
   // Imagem de Referência para a IA guiar o estilo
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -297,8 +299,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         prompt: bgPrompt || 'premium dark cinematic background for advertising',
         size: sizeMap[format],
         aspectRatio: format,
-        // Não forçar provider: deixar o servidor detectar pelo prefixo da chave
-        // provider: provider === 'Opus 4.8' ? 'Opus 4.8' : 'openai',
+        preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
         apiKey,
       };
 
@@ -918,6 +919,53 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 placeholder="Ex: Dark luxury modern glass office, cinematic depth of field, neon accents..."
                 className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 text-xs focus:border-brand-500 focus:outline-none resize-none"
               />
+
+              {/* Seletor de Modelo */}
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  Modelo de IA
+                </label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold focus:border-brand-500 focus:outline-none"
+                >
+                  <option value="auto" className="bg-[#11131a]">
+                    ⭐ Auto (pula do melhor para o mais barato)
+                  </option>
+                  <option value="gpt-image-2.5-sunburst" className="bg-[#11131a]">
+                    💎 gpt-image-2.5-sunburst (Premium, $0.20)
+                  </option>
+                  <option value="gpt-image-2.5-flare" className="bg-[#11131a]">
+                    ⚡ gpt-image-2.5-flare (Rápido, $0.10)
+                  </option>
+                  <option value="gpt-image-2.5" className="bg-[#11131a]">
+                    🔷 gpt-image-2.5 (Top, $0.15)
+                  </option>
+                  <option value="gpt-image-2" className="bg-[#11131a]">
+                    🆕 gpt-image-2 (Novo, $0.05)
+                  </option>
+                  <option value="gpt-image-1.5" className="bg-[#11131a]">
+                    🌟 gpt-image-1.5 (Excelente, $0.04-$0.08)
+                  </option>
+                  <option value="gpt-image-1" className="bg-[#11131a]">
+                    ✨ gpt-image-1 (Recomendado, $0.02)
+                  </option>
+                  <option value="gpt-image-1-mini" className="bg-[#11131a]">
+                    💰 gpt-image-1-mini (Econômico, $0.005)
+                  </option>
+                  <option value="dall-e-3" className="bg-[#11131a]">
+                    🎨 DALL-E 3 (Clássico, $0.04)
+                  </option>
+                  <option value="dall-e-2" className="bg-[#11131a]">
+                    🏷️ DALL-E 2 (Básico, $0.02)
+                  </option>
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  💡 <strong>Auto</strong> tenta o melhor e cai para o mais barato se falhar. <strong>Recomendado</strong> para testes.
+                </p>
+              </div>
+
               <div className="flex gap-2">
                 <button
                   onClick={handleGenerateBg}

@@ -120,7 +120,7 @@ function detectProvider(key: string): 'openai' | 'Opus 4.8' | 'unknown' {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, size = '1024x1024', apiKey, aspectRatio } = await req.json();
+    const { prompt, size = '1024x1024', apiKey, aspectRatio, preferredModel } = await req.json();
 
     // Sanitiza a chave
     const key = String(apiKey || process.env.OPENAI_API_KEY || '')
@@ -171,18 +171,36 @@ export async function POST(req: NextRequest) {
       if (size === '1920x1080' || size === '1792x1024') requestedSize = '1792x1024';
       else if (size === '1080x1920' || size === '1024x1792') requestedSize = '1024x1792';
 
-      const modelAttempts = [
-        { name: 'gpt-image-1', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-1.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-1-mini', size: '1024x1024' },
-        { name: 'gpt-image-2.5-sunburst', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-2.5-flare', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-2.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'gpt-image-2', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'chatgpt-image-latest', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
-        { name: 'dall-e-3', size: requestedSize },
-        { name: 'dall-e-2', size: '1024x1024' },
+      // Lista padrao: tenta do mais recomendado para o mais antigo
+      const defaultModels = [
+        'gpt-image-1',
+        'gpt-image-1.5',
+        'gpt-image-1-mini',
+        'gpt-image-2.5-sunburst',
+        'gpt-image-2.5-flare',
+        'gpt-image-2.5',
+        'gpt-image-2',
+        'chatgpt-image-latest',
+        'dall-e-3',
+        'dall-e-2',
       ];
+
+      // Se o usuario escolheu um modelo especifico, prioriza ele
+      let orderedModels: string[];
+      if (preferredModel && defaultModels.includes(preferredModel)) {
+        orderedModels = [preferredModel, ...defaultModels.filter((m) => m !== preferredModel)];
+      } else {
+        orderedModels = defaultModels;
+      }
+
+      const modelAttempts = orderedModels.map((name) => ({
+        name,
+        size: name === 'dall-e-3' ? requestedSize :
+              name === 'dall-e-2' ? '1024x1024' :
+              requestedSize === '1792x1024' ? '1536x1024' :
+              requestedSize === '1024x1792' ? '1024x1536' :
+              requestedSize,
+      }));
 
       const errorLog: string[] = [];
       for (const attempt of modelAttempts) {
