@@ -35,7 +35,7 @@ export interface FlowBlock {
   x: number;
   y: number;
   data: any; // dados especificos do bloco
-  output?: string; // texto gerado pela IA (para blocos de output)
+  output?: string | string[]; // texto/imagens geradas pela IA
 }
 
 export interface FlowConnection {
@@ -219,7 +219,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         // Gerar 4 variacoes de copy via Mestre dos Prompts
         const variations = await generateCopyVariations(briefing, style, apiKey);
         setBlocks((prev) =>
-          prev.map((b) => (b.id === blockId ? { ...b, output: variations } : b))
+          prev.map((b): FlowBlock => (b.id === blockId ? { ...b, output: variations } : b))
         );
         setOutputModal({ blockId, output: variations });
       } else if (block.type === 'image-output' || block.type === 'variations-output') {
@@ -230,7 +230,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           if (url) imageUrls.push(url);
         }
         setBlocks((prev) =>
-          prev.map((b) =>
+          prev.map((b): FlowBlock =>
             b.id === blockId ? { ...b, output: imageUrls } : b
           )
         );
