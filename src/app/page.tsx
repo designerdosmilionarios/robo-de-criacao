@@ -46,6 +46,7 @@ type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' |
 export default function Home() {
   const [brands, setBrands] = useState<BrandKit[]>(DEFAULT_BRANDS);
   const [activeBrandId, setActiveBrandId] = useState<string>(DEFAULT_BRANDS[0].id);
+  const [brandsLoaded, setBrandsLoaded] = useState(false);
   const [project, setProject] = useState<CarouselProject>(INITIAL_CAROUSEL);
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
 
@@ -98,10 +99,26 @@ export default function Home() {
   // Carregar configurações salvas
   useEffect(() => {
     setOpenaiApiKey(localStorage.getItem('openai_api_key') || '');
+    try {
+      const savedBrands = JSON.parse(localStorage.getItem('brand_kits') || 'null');
+      if (Array.isArray(savedBrands) && savedBrands.length > 0) setBrands(savedBrands);
+      const savedActiveBrand = localStorage.getItem('active_brand_id');
+      if (savedActiveBrand) setActiveBrandId(savedActiveBrand);
+    } catch (error) {
+      console.error('Erro ao carregar as marcas:', error);
+    } finally {
+      setBrandsLoaded(true);
+    }
     // Limpar chave antiga do Google/Claude se existir (não usa mais)
     localStorage.removeItem('claude_api_key');
     // As fontes agora sao gerenciadas pelo hook useLocalFonts (IndexedDB)
   }, []);
+
+  useEffect(() => {
+    if (!brandsLoaded) return;
+    localStorage.setItem('brand_kits', JSON.stringify(brands));
+    localStorage.setItem('active_brand_id', activeBrandId);
+  }, [brands, activeBrandId, brandsLoaded]);
 
   // Salvar preferências sempre que mudarem
   useEffect(() => {
@@ -177,12 +194,23 @@ export default function Home() {
   };
 
   // Exportações
+  const carouselExportSize = project.aspectRatio === '4:5'
+    ? { width: 1080, height: 1350 }
+    : project.aspectRatio === '1:1'
+    ? { width: 1080, height: 1080 }
+    : { width: 1080, height: 1920 };
+
   const handleDownloadSingleSlide = async () => {
     const el = document.getElementById(`carousel-slide-${activeSlide.id}`);
     if (!el) return;
     setIsExporting(true);
     try {
-      const dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true });
+      const dataUrl = await toPng(el, {
+        pixelRatio: 1,
+        canvasWidth: carouselExportSize.width,
+        canvasHeight: carouselExportSize.height,
+        cacheBust: true,
+      });
       saveAs(
         dataUrl,
         `${project.title.toLowerCase().replace(/\s+/g, '-')}-slide-${activeSlideIndex + 1}.png`
@@ -204,7 +232,12 @@ export default function Home() {
         const slide = project.slides[i];
         const el = document.getElementById(`carousel-slide-${slide.id}`);
         if (el) {
-          const dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true });
+          const dataUrl = await toPng(el, {
+            pixelRatio: 1,
+            canvasWidth: carouselExportSize.width,
+            canvasHeight: carouselExportSize.height,
+            cacheBust: true,
+          });
           const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
           folder.file(`slide-0${i + 1}.png`, base64Data, { base64: true });
         }
@@ -252,56 +285,70 @@ export default function Home() {
 
   // Salvar projeto de CARROSSEL
   const handleSaveCarouselProject = useCallback(
-    (name: string) => {
+    async (name: string) => {
       // Gera thumbnail do primeiro slide
       const firstSlide = project.slides[0];
       const el = firstSlide ? document.getElementById(`carousel-slide-${firstSlide.id}`) : null;
-      const thumbnail = el
-        ? null // Será gerado de forma assíncrona logo abaixo
-        : undefined;
-
-      // Gera o thumbnail assincronamente
-      const generateAndSave = async () => {
-        let thumbDataUrl: string | undefined;
-        if (el) {
-          try {
-            thumbDataUrl = await toPng(el, { pixelRatio: 0.5, cacheBust: true });
-          } catch (e) {
-            console.warn('Falha ao gerar thumbnail:', e);
-          }
+      let thumbDataUrl: string | undefined;
+      if (el) {
+        try {
+          thumbDataUrl = await toPng(el, { pixelRatio: 0.5, cacheBust: true });
+        } catch (e) {
+          console.warn('Falha ao gerar thumbnail:', e);
         }
+      }
 
-        const saved: SavedProject = {
-          id: `carousel-${Date.now()}`,
-          name,
-          type: 'carousel',
-          brandId: activeBrandId,
-          brandName: activeBrand.name,
-          thumbnail: thumbDataUrl,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          data: { project: { ...project, brandId: activeBrandId } },
-        };
-        saveProject(saved);
+      const saved: SavedProject = {
+        id: `carousel-${Date.now()}`,
+        name,
+        type: 'carousel',
+        brandId: activeBrandId,
+        brandName: activeBrand.name,
+        thumbnail: thumbDataUrl,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        data: { project: { ...project, brandId: activeBrandId } },
+      };
+      const didSave = await saveProject(saved);
+      if (didSave) {
         setLastSavedName(name);
         setTimeout(() => setLastSavedName(null), 3000);
-      };
-
-      generateAndSave();
+      }
+      return didSave;
     },
     [project, activeBrandId, activeBrand, saveProject]
   );
 
   // Salvar projeto de CRIATIVO ÚNICO
   const singleImageStateRef = useRef<any>(null);
-  const setSingleImageRef = useCallback((state: any) => {
-    singleImageStateRef.current = state;
+  const pendingSingleLoadRef = useRef<any>(null);
+  const setSingleImageRef = useCallback((controls: any) => {
+    singleImageStateRef.current = controls;
+    if (pendingSingleLoadRef.current) {
+      controls.load(pendingSingleLoadRef.current);
+      pendingSingleLoadRef.current = null;
+    }
   }, []);
 
   // Salvar projeto de POSE
   const poseStateRef = useRef<any>(null);
-  const setPoseRef = useCallback((state: any) => {
-    poseStateRef.current = state;
+  const pendingPoseLoadRef = useRef<any>(null);
+  const setPoseRef = useCallback((controls: any) => {
+    poseStateRef.current = controls;
+    if (pendingPoseLoadRef.current) {
+      controls.load(pendingPoseLoadRef.current);
+      pendingPoseLoadRef.current = null;
+    }
+  }, []);
+
+  const batchAdsStateRef = useRef<any>(null);
+  const pendingBatchLoadRef = useRef<any>(null);
+  const setBatchAdsRef = useCallback((controls: any) => {
+    batchAdsStateRef.current = controls;
+    if (pendingBatchLoadRef.current) {
+      controls.load(pendingBatchLoadRef.current);
+      pendingBatchLoadRef.current = null;
+    }
   }, []);
 
   // Função genérica chamada pelo modal
@@ -310,18 +357,20 @@ export default function Home() {
       const now = new Date().toISOString();
 
       const buildAndSave = async (project: SavedProject) => {
-        saveProject(project);
-        setLastSavedName(name);
-        setTimeout(() => setLastSavedName(null), 3000);
+        const didSave = await saveProject(project);
+        if (didSave) {
+          setLastSavedName(name);
+          setTimeout(() => setLastSavedName(null), 3000);
+        }
+        return didSave;
       };
 
       if (saveModalType === 'carousel') {
-        handleSaveCarouselProject(name);
-        return;
+        return handleSaveCarouselProject(name);
       }
 
       if (saveModalType === 'single-image' && singleImageStateRef.current) {
-        const state = singleImageStateRef.current;
+        const state = singleImageStateRef.current.state;
         const el = document.getElementById('single-creative-canvas');
         let thumbnail: string | undefined;
         if (el) {
@@ -331,7 +380,7 @@ export default function Home() {
             console.warn('Falha ao gerar thumbnail:', e);
           }
         }
-        await buildAndSave({
+        return buildAndSave({
           id: `single-${Date.now()}`,
           name,
           type: 'single-image',
@@ -342,13 +391,12 @@ export default function Home() {
           updatedAt: now,
           data: { ...state },
         });
-        return;
       }
 
       if (saveModalType === 'pose' && poseStateRef.current) {
-        const state = poseStateRef.current;
+        const state = poseStateRef.current.state;
         const firstImage = state.generatedPoses?.[0];
-        await buildAndSave({
+        return buildAndSave({
           id: `pose-${Date.now()}`,
           name,
           type: 'pose',
@@ -359,8 +407,23 @@ export default function Home() {
           updatedAt: now,
           data: { ...state },
         });
-        return;
       }
+
+      if (saveModalType === 'batch-ads' && batchAdsStateRef.current) {
+        const state = batchAdsStateRef.current.state;
+        return buildAndSave({
+          id: `batch-${Date.now()}`,
+          name,
+          type: 'batch-ads',
+          brandId: activeBrandId,
+          brandName: activeBrand.name,
+          createdAt: now,
+          updatedAt: now,
+          data: { ...state },
+        });
+      }
+
+      return false;
     },
     [saveModalType, handleSaveCarouselProject, activeBrandId, activeBrand, saveProject]
   );
@@ -378,20 +441,17 @@ export default function Home() {
         }
         case 'single-image':
           setActiveTab('single-image');
-          if (singleImageStateRef.current?.load) {
-            singleImageStateRef.current.load(project.data);
-          }
+          pendingSingleLoadRef.current = project.data;
           setActiveBrandId(project.brandId);
           break;
         case 'pose':
           setActiveTab('poses');
-          if (poseStateRef.current?.load) {
-            poseStateRef.current.load(project.data);
-          }
+          pendingPoseLoadRef.current = project.data;
           setActiveBrandId(project.brandId);
           break;
         case 'batch-ads':
           setActiveTab('batch-ads');
+          pendingBatchLoadRef.current = project.data;
           setActiveBrandId(project.brandId);
           break;
       }
@@ -659,9 +719,7 @@ export default function Home() {
             localFonts={localFonts}
             externalPersonImage={personImageForCreative}
             onClearExternalPerson={() => setPersonImageForCreative(null)}
-            onRegisterControls={(controls) => {
-              setSingleImageRef(controls);
-            }}
+            onRegisterControls={setSingleImageRef}
             onSaveRequest={() => openSaveProjectModal('single-image', 'Criativo Único')}
           />
         )}
@@ -675,9 +733,7 @@ export default function Home() {
               setPersonImageForCreative(imgUrl);
               setActiveTab('single-image');
             }}
-            onRegisterControls={(controls) => {
-              setPoseRef(controls);
-            }}
+            onRegisterControls={setPoseRef}
             onSaveRequest={() => openSaveProjectModal('pose', 'Pose / Pessoa')}
           />
         )}
@@ -685,6 +741,7 @@ export default function Home() {
         {activeTab === 'batch-ads' && (
           <AdBatchGenerator
             brand={activeBrand}
+            onRegisterControls={setBatchAdsRef}
             onSaveRequest={(payload) =>
               openSaveProjectModal('batch-ads', payload?.name || 'Lote Meta Ads')
             }
@@ -770,10 +827,11 @@ export default function Home() {
           });
         }}
         onDeleteBrand={(id) => {
-          setBrands((prev) => prev.filter((b) => b.id !== id));
-          if (activeBrandId === id && brands.length > 1) {
-            setActiveBrandId(brands[0].id);
-          }
+          setBrands((prev) => {
+            const next = prev.filter((b) => b.id !== id);
+            if (activeBrandId === id && next[0]) setActiveBrandId(next[0].id);
+            return next;
+          });
         }}
       />
 

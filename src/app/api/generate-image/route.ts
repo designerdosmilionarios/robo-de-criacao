@@ -4,8 +4,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Endpoint dedicado OpenAI / ChatGPT.
-// Suporta os modelos da OpenAI Platform:
-// gpt-image-2.5, gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3, dall-e-2.
+// Suporta os modelos atuais de geração de imagem da OpenAI Platform.
 // Tambem faz fallback automatico para Opus 4.8 Opus 4.8 Studio se a chave comecar com "AIza".
 
 async function tryOpenAI(key: string, prompt: string, size: string, model: string) {
@@ -20,7 +19,7 @@ async function tryOpenAI(key: string, prompt: string, size: string, model: strin
 
   if (isGptImage) {
     // gpt-image-1 aceita apenas 1024x1024, 1024x1536, 1536x1024 (auto)
-    // gpt-image-2.5 sunburst/flare tambem aceitam esses tamanhos
+    // Modelos GPT Image aceitam os tamanhos abaixo.
     body.size = size === '1792x1024' ? '1536x1024' : size === '1024x1792' ? '1024x1536' : size;
   } else {
     // dall-e aceita tamanhos especificos
@@ -169,20 +168,14 @@ export async function POST(req: NextRequest) {
     if (detectedProvider === 'openai') {
       let requestedSize = '1024x1024';
       if (size === '1920x1080' || size === '1792x1024') requestedSize = '1792x1024';
-      else if (size === '1080x1920' || size === '1024x1792') requestedSize = '1024x1792';
+      else if (size === '1080x1920' || size === '1024x1792' || finalAspect === '4:5') requestedSize = '1024x1792';
 
       // Lista padrao: tenta do mais recomendado para o mais antigo
       const defaultModels = [
-        'gpt-image-1',
-        'gpt-image-1.5',
-        'gpt-image-1-mini',
         'gpt-image-2.5-sunburst',
         'gpt-image-2.5-flare',
-        'gpt-image-2.5',
         'gpt-image-2',
-        'chatgpt-image-latest',
-        'dall-e-3',
-        'dall-e-2',
+        'gpt-image-1',
       ];
 
       // Se o usuario escolheu um modelo especifico, prioriza ele

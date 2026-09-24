@@ -120,6 +120,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
         selectedBg,
         customDetails,
         generatedPoses,
+        faceImage,
       },
       load: (data: any) => {
         if (data.selectedPose) setSelectedPose(data.selectedPose);
@@ -127,6 +128,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
         if (data.selectedBg) setSelectedBg(data.selectedBg);
         if ('customDetails' in data) setCustomDetails(data.customDetails || '');
         if (Array.isArray(data.generatedPoses)) setGeneratedPoses(data.generatedPoses);
+        if ('faceImage' in data) setFaceImage(data.faceImage || null);
       },
     });
   }, [
@@ -136,6 +138,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
     selectedBg,
     customDetails,
     generatedPoses,
+    faceImage,
   ]);
 
   const handleUploadFace = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,7 +189,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
       };
 
       if (faceImage) {
-        requestBody.imageBase64 = faceImage.replace(/^data:image\/\w+;base64,/, '');
+        requestBody.imageBase64 = faceImage;
       }
 
       const res = await fetch(endpoint, {

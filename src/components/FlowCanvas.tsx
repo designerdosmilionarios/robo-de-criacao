@@ -118,6 +118,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [connections, setConnections] = useState<FlowConnection[]>([]);
   const [draggingBlock, setDraggingBlock] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
   const [loadingReferences, setLoadingReferences] = useState(false);
@@ -184,7 +185,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   // Iniciar drag de bloco
   const handleBlockMouseDown = (e: React.MouseEvent, blockId: string) => {
     if (connecting) return;
-    if ((e.target as HTMLElement).closest('button')) return; // nao arrastar ao clicar em botoes
+    if ((e.target as HTMLElement).closest('button, input, textarea, select, label')) return;
     const block = blocks.find((b) => b.id === blockId);
     if (!block || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -223,30 +224,40 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   useEffect(() => {
     if (!connecting) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setConnecting(null);
+      if (e.key === 'Escape') {
+        setConnecting(null);
+        setConnectionMessage(null);
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [connecting]);
 
-  // Conectar blocos
-  const handleConnectClick = (blockId: string) => {
+  const startConnection = (blockId: string) => {
+    setConnecting(blockId);
+    setConnectionMessage('Agora clique na ENTRADA do bloco que deve receber estes dados.');
+  };
+
+  const finishConnection = (blockId: string) => {
     if (!connecting) {
-      setConnecting(blockId);
-    } else if (connecting !== blockId) {
-      // Criar conexão (evitar duplicata)
-      const exists = connections.some((c) => c.from === connecting && c.to === blockId);
-      if (!exists) {
-        setConnections((prev) => [
-          ...prev,
-          { id: `conn-${Date.now()}`, from: connecting, to: blockId },
-        ]);
-      }
-      setConnecting(null);
-    } else {
-      // Clicou no mesmo bloco, cancela
-      setConnecting(null);
+      setConnectionMessage('Primeiro clique na SAÍDA de um bloco de Briefing, Logo, Referência ou Estilo.');
+      return;
     }
+    if (connecting === blockId) {
+      setConnecting(null);
+      setConnectionMessage(null);
+      return;
+    }
+    const exists = connections.some((c) => c.from === connecting && c.to === blockId);
+    if (!exists) {
+      setConnections((prev) => [
+        ...prev,
+        { id: `conn-${Date.now()}`, from: connecting, to: blockId },
+      ]);
+    }
+    setConnecting(null);
+    setConnectionMessage('Nodes conectados com sucesso.');
+    window.setTimeout(() => setConnectionMessage(null), 2500);
   };
 
   // Gerar saida de um bloco (executa o flow)
@@ -269,6 +280,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
     if (!briefing && (block.type === 'copy-output' || block.type === 'image-output' || block.type === 'variations-output')) {
       alert('Conecte um bloco "Briefing" antes deste bloco de output. Arraste da bolinha direita do Briefing para a esquerda deste bloco.');
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      alert('Configure sua chave OpenAI no botao "API" antes de gerar os criativos.');
       return;
     }
 
@@ -339,7 +355,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             title="Importa ate 30 imagens da pasta REFERENCIAS/ como blocos"
           >
             {loadingReferences ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-            Importar Pasta ({375})
+            Importar pasta
           </button>
           <button
             onClick={() => handleCreateBlock('style')}
@@ -457,7 +473,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleConnectClick(block.id);
+                        startConnection(block.id);
                       }}
                       className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all ${
                         connecting === block.id
@@ -700,7 +716,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleConnectClick(block.id);
+                      finishConnection(block.id);
                     }}
                     className={`absolute -left-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all border-2 border-[#0a0b10] ${
                       connecting === block.id
@@ -717,29 +733,23 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           );
         })}
 
-        {/* Status de conexao em progresso */}
-        {connecting && (
+        {/* Status da conexão */}
+        {(connecting || connectionMessage) && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-100 text-xs font-bold shadow-xl animate-pulse">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            Clique no botão <span className="px-1.5 py-0.5 bg-emerald-500 text-white rounded text-[9px]">📥 ENTRADA</span> do bloco de destino
-            <button
-              onClick={() => setConnecting(null)}
-              className="ml-2 px-2 py-0.5 bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-100 rounded text-[10px]"
-            >
-              Cancelar (ESC)
-            </button>
+            {connectionMessage}
+            {connecting && (
+              <button
+                onClick={() => {
+                  setConnecting(null);
+                  setConnectionMessage(null);
+                }}
+                className="ml-2 px-2 py-0.5 bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-100 rounded text-[10px]"
+              >
+                Cancelar (ESC)
+              </button>
+            )}
           </div>
-        )}
-
-        {/* Botao de cancelar conexao (ESC) */}
-        {connecting && (
-          <div
-            className="fixed inset-0 z-30"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setConnecting(null);
-            }}
-            tabIndex={0}
-          />
         )}
       </div>
 
@@ -810,26 +820,30 @@ async function generateCopyVariations(
   style: any,
   apiKey: string
 ): Promise<string[]> {
-  // Usa o Mestre dos Prompts para gerar 4 variacoes de copy
-  try {
-    const res = await fetch('/api/master-prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        brief: `Gere 4 variacoes de copy (headline, destaque, CTA) para um anuncio. Briefing: ${briefing}. Tom: ${style?.tone || 'profissional'}. Retorne 4 linhas separadas por | no formato: HEADLINE | DESTAQUE | CTA`,
-        apiKey,
-      }),
-    });
-    const data = await res.json();
-    if (data.prompt) {
-      // Quebrar por linha ou por |
-      const lines = data.prompt.split(/\n|\|/).filter((l: string) => l.trim().length > 10);
-      return lines.slice(0, 4);
-    }
-    return ['Use o Mestre dos Prompts para gerar copy'];
-  } catch (e) {
-    return ['Erro ao gerar copy'];
+  const res = await fetch('/api/master-prompt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      brief: `${briefing}. Tom: ${style?.tone || 'profissional'}.`,
+      type: 'copy',
+      apiKey,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Nao foi possivel gerar as variacoes de copy.');
   }
+
+  const lines = String(data.prompt || '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*(?:\d+[.)-]?|[-*])\s*/, '').trim())
+    .filter((line) => line.includes('|'));
+
+  if (lines.length === 0) {
+    throw new Error('A IA respondeu em um formato inesperado. Tente gerar novamente.');
+  }
+
+  return lines.slice(0, 4);
 }
 
 async function generateImage(
@@ -839,34 +853,35 @@ async function generateImage(
   apiKey: string,
   references: string[] = []
 ): Promise<string | null> {
-  try {
-    // Enriquece o prompt mencionando que ha referencias visuais
-    const enhancedPrompt = references.length > 0
-      ? `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}. This image has ${references.length} visual reference(s) attached - use them as inspiration for style, composition, and mood.`
-      : `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}`;
+  // Enriquece o prompt mencionando que ha referencias visuais
+  const enhancedPrompt = references.length > 0
+    ? `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}. This image has ${references.length} visual reference(s) attached - use them as inspiration for style, composition, and mood.`
+    : `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}`;
 
-    const res = await fetch('/api/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: enhancedPrompt,
-        size: '1024x1024',
-        aspectRatio: '1:1',
-        provider: 'openai',
-        preferredModel: 'auto',
-        apiKey,
-        // Prioridade: referencia principal (logo ou primeira reference)
-        ...(logoUrl
-          ? { imageBase64: logoUrl.replace(/^data:image\/\w+;base64,/, '') }
-          : references[0]
-          ? { imageBase64: references[0].replace(/^data:image\/\w+;base64,/, '') }
-          : {}),
-      }),
-    });
-    const data = await res.json();
-    if (data.imageUrl) return data.imageUrl;
-    return null;
-  } catch (e) {
-    return null;
+  const res = await fetch('/api/generate-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: enhancedPrompt,
+      size: '1024x1024',
+      aspectRatio: '1:1',
+      provider: 'openai',
+      preferredModel: 'auto',
+      apiKey,
+      // Prioridade: referencia principal (logo ou primeira reference)
+      ...(logoUrl
+        ? { imageBase64: logoUrl.replace(/^data:image\/\w+;base64,/, '') }
+        : references[0]
+        ? { imageBase64: references[0].replace(/^data:image\/\w+;base64,/, '') }
+        : {}),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Nao foi possivel gerar a imagem.');
   }
+  if (!data.imageUrl) {
+    throw new Error('O provedor respondeu sem uma imagem.');
+  }
+  return data.imageUrl;
 }

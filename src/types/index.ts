@@ -166,6 +166,9 @@ export interface SavedSingleImageData {
   textAlignment: 'left' | 'center';
   selectedBadge: string | null;
   generatedGallery: string[];
+  editMode?: 'auto' | 'free';
+  freeLayers?: Array<Record<string, unknown>>;
+  selectedModel?: string;
 }
 
 export interface SavedPoseData {
@@ -174,12 +177,13 @@ export interface SavedPoseData {
   selectedBg: string;
   customDetails: string;
   generatedPoses: string[];
+  faceImage?: string | null;
 }
 
 export interface SavedBatchAdsData {
-  productName: string;
-  audience: string;
-  tone: string;
+  productTopic: string;
+  targetPain: string;
+  selectedFormat: '4:5' | '1:1' | '9:16';
   variations: Array<{
     id: string;
     headline: string;

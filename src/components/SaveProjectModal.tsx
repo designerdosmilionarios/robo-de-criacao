@@ -5,7 +5,7 @@ import { Save, X, Loader2 } from 'lucide-react';
 interface SaveProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (name: string) => void;
+  onSave: (name: string) => void | boolean | Promise<void | boolean>;
   defaultName?: string;
   type: SavedProjectType;
   existingId?: string; // se for atualização
@@ -41,12 +41,12 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
-    // Pequeno delay para dar feedback visual
-    setTimeout(() => {
-      onSave(name.trim());
+    try {
+      const saved = await onSave(name.trim());
+      if (saved !== false) onClose();
+    } finally {
       setSaving(false);
-      onClose();
-    }, 300);
+    }
   };
 
   return (

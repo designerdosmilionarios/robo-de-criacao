@@ -1,3 +1,5 @@
+import type { SavedProject } from '@/types';
+
 // Wrapper de IndexedDB com fallback para localStorage.
 // Resolve o problema de limite de 5MB do localStorage (IndexedDB tem 50MB-1GB).
 
@@ -79,6 +81,19 @@ async function idbClear(storeName: string): Promise<void> {
   });
 }
 
+async function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    store.clear();
+    values.forEach((value) => store.put(value));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Transação cancelada.'));
+  });
+}
+
 // =============================
 // API PUBLICA: FONTES LOCAIS
 // =============================
@@ -157,6 +172,56 @@ export async function clearAllFontsFromDB(): Promise<void> {
     await idbClear(STORE_FONTS);
   } catch (e) {
     console.warn('Falha ao limpar IndexedDB:', e);
+  }
+}
+
+// =============================
+// API PUBLICA: PROJETOS SALVOS
+// =============================
+
+const LEGACY_PROJECTS_KEY = 'saved_projects';
+
+export async function loadProjectsFromDB(): Promise<SavedProject[]> {
+  try {
+    return await idbGetAll<SavedProject>(STORE_PROJECTS);
+  } catch {
+    try {
+      const raw = localStorage.getItem(LEGACY_PROJECTS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+}
+
+export async function saveProjectsToDB(projects: SavedProject[]): Promise<void> {
+  try {
+    await idbReplaceAll(STORE_PROJECTS, projects);
+  } catch {
+    // Mantém compatibilidade com navegadores sem IndexedDB.
+    localStorage.setItem(LEGACY_PROJECTS_KEY, JSON.stringify(projects));
+  }
+}
+
+export async function migrateProjectsFromLocalStorage(): Promise<number> {
+  try {
+    const raw = localStorage.getItem(LEGACY_PROJECTS_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return 0;
+    const existing = await idbGetAll<SavedProject>(STORE_PROJECTS);
+    const merged = new Map<string, SavedProject>();
+    parsed.forEach((project: SavedProject) => merged.set(project.id, project));
+    existing.forEach((project) => merged.set(project.id, project));
+    const imported = Math.max(0, merged.size - existing.length);
+    if (imported > 0) {
+      await idbReplaceAll(STORE_PROJECTS, Array.from(merged.values()));
+    }
+    // Mantem o localStorage como copia de seguranca da migracao.
+    return imported;
+  } catch {
+    return 0;
   }
 }
 

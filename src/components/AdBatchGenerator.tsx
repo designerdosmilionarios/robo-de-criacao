@@ -7,9 +7,10 @@ import saveAs from 'file-saver';
 interface AdBatchGeneratorProps {
   brand: BrandKit;
   onSaveRequest?: (payload: { name: string }) => void;
+  onRegisterControls?: (controls: { state: any; load: (data: any) => void }) => void;
 }
 
-export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand, onSaveRequest }) => {
+export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand, onSaveRequest, onRegisterControls }) => {
   const [productTopic, setProductTopic] = useState('Consórcio Imobiliário sem Juros');
   const [targetPain, setTargetPain] = useState('Juros abusivos de financiamento bancário');
   const [selectedFormat, setSelectedFormat] = useState<'4:5' | '1:1' | '9:16'>('4:5');
@@ -54,6 +55,19 @@ export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand, onSav
       bgGradient: 'from-dark-900 to-[#0e1726]',
     },
   ]);
+
+  useEffect(() => {
+    if (!onRegisterControls) return;
+    onRegisterControls({
+      state: { productTopic, targetPain, selectedFormat, variations },
+      load: (data: any) => {
+        if (typeof data.productTopic === 'string') setProductTopic(data.productTopic);
+        if (typeof data.targetPain === 'string') setTargetPain(data.targetPain);
+        if (['4:5', '1:1', '9:16'].includes(data.selectedFormat)) setSelectedFormat(data.selectedFormat);
+        if (Array.isArray(data.variations)) setVariations(data.variations);
+      },
+    });
+  }, [onRegisterControls, productTopic, targetPain, selectedFormat, variations]);
 
   const handleGenerateBatch = () => {
     setIsGenerating(true);
@@ -105,7 +119,17 @@ export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand, onSav
     if (!el) return;
     setDownloadingId(id);
     try {
-      const dataUrl = await toPng(el, { pixelRatio: 2.5, cacheBust: true });
+      const exportSize = selectedFormat === '4:5'
+        ? { width: 1080, height: 1350 }
+        : selectedFormat === '1:1'
+        ? { width: 1080, height: 1080 }
+        : { width: 1080, height: 1920 };
+      const dataUrl = await toPng(el, {
+        pixelRatio: 1,
+        canvasWidth: exportSize.width,
+        canvasHeight: exportSize.height,
+        cacheBust: true,
+      });
       saveAs(dataUrl, `anuncio-${brand.name.toLowerCase().replace(/\s+/g, '-')}-${index + 1}.png`);
     } catch (e) {
       console.error(e);

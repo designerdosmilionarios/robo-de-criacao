@@ -251,6 +251,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         textAlignment,
         selectedBadge,
         generatedGallery,
+        editMode,
+        selectedModel,
       },
       load: (data: any) => {
         if (data.format) setFormat(data.format);
@@ -295,6 +297,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if (data.textAlignment) setTextAlignment(data.textAlignment);
         if ('selectedBadge' in data) setSelectedBadge(data.selectedBadge);
         if (Array.isArray(data.generatedGallery)) setGeneratedGallery(data.generatedGallery);
+        if (data.editMode === 'auto' || data.editMode === 'free') setEditMode(data.editMode);
+        if (typeof data.selectedModel === 'string') setSelectedModel(data.selectedModel);
       },
     });
   }, [
@@ -341,6 +345,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     textAlignment,
     selectedBadge,
     generatedGallery,
+    editMode,
+    selectedModel,
   ]);
 
   // Sincronizar imagem externa enviada do Estúdio de Poses
@@ -430,7 +436,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       };
 
       if (referenceImage) {
-        requestBody.imageBase64 = referenceImage.replace(/^data:image\/\w+;base64,/, '');
+        requestBody.imageBase64 = referenceImage;
       }
 
       const res = await fetch(endpoint, {
@@ -490,7 +496,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             aspectRatio: format,
             preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
             apiKey,
-            ...(referenceImage ? { imageBase64: referenceImage.replace(/^data:image\/\w+;base64,/, '') } : {}),
+            ...(referenceImage ? { imageBase64: referenceImage } : {}),
           }),
         });
         const data = await res.json();
@@ -539,7 +545,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     };
 
     // Pega base64 da imagem atual (sem o prefixo data:image/...)
-    const base64Image = bgImage.replace(/^data:image\/\w+;base64,/, '');
+    const base64Image = bgImage;
 
     try {
       const res = await fetch('/api/generate-image', {
@@ -617,19 +623,12 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     const el = document.getElementById('single-creative-canvas');
     if (!el) return;
     try {
-      // Temporariamente ajusta o background para o download (caso o user tenha escolhido cor solida ou degradê)
-      const originalBg = (el as HTMLElement).style.backgroundColor;
-      if (useGradient && !bgImage) {
-        (el as HTMLElement).style.backgroundColor =
-          `linear-gradient(${gradientAngle}deg, ${gradientColor1} 0%, ${gradientColor2} 100%)`;
-      } else if (!bgImage) {
-        (el as HTMLElement).style.backgroundColor = gradientColor1;
-      }
-
-      const dataUrl = await toPng(el, { pixelRatio: 2, cacheBust: true });
-
-      // Restaura o background cinza de visualização
-      (el as HTMLElement).style.backgroundColor = originalBg;
+      const dataUrl = await toPng(el, {
+        pixelRatio: 1,
+        canvasWidth: currentFormat.width,
+        canvasHeight: currentFormat.height,
+        cacheBust: true,
+      });
 
       saveAs(
         dataUrl,
@@ -757,6 +756,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   setGradientColor2(config.visual.gradientColor2);
                   setGradientAngle(config.visual.gradientAngle);
                   setGlowIntensity(config.visual.glowIntensity);
+                  setEditMode('auto');
                 }}
               />
             ) : (
@@ -1572,35 +1572,20 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     ⭐ Auto (pula do melhor para o mais barato)
                   </option>
                   <option value="gpt-image-2.5-sunburst" className="bg-[#11131a]">
-                    💎 gpt-image-2.5-sunburst (Premium, $0.20)
+                    💎 GPT Image 2.5 Sunburst (máxima qualidade)
                   </option>
                   <option value="gpt-image-2.5-flare" className="bg-[#11131a]">
-                    ⚡ gpt-image-2.5-flare (Rápido, $0.10)
-                  </option>
-                  <option value="gpt-image-2.5" className="bg-[#11131a]">
-                    🔷 gpt-image-2.5 (Top, $0.15)
+                    ⚡ GPT Image 2.5 Flare (mais rápido)
                   </option>
                   <option value="gpt-image-2" className="bg-[#11131a]">
-                    🆕 gpt-image-2 (Novo, $0.05)
-                  </option>
-                  <option value="gpt-image-1.5" className="bg-[#11131a]">
-                    🌟 gpt-image-1.5 (Excelente, $0.04-$0.08)
+                    ✨ GPT Image 2
                   </option>
                   <option value="gpt-image-1" className="bg-[#11131a]">
-                    ✨ gpt-image-1 (Recomendado, $0.02)
-                  </option>
-                  <option value="gpt-image-1-mini" className="bg-[#11131a]">
-                    💰 gpt-image-1-mini (Econômico, $0.005)
-                  </option>
-                  <option value="dall-e-3" className="bg-[#11131a]">
-                    🎨 DALL-E 3 (Clássico, $0.04)
-                  </option>
-                  <option value="dall-e-2" className="bg-[#11131a]">
-                    🏷️ DALL-E 2 (Básico, $0.02)
+                    ↩ GPT Image 1 (compatibilidade)
                   </option>
                 </select>
                 <p className="text-[10px] text-gray-500 mt-1">
-                  💡 <strong>Auto</strong> tenta o melhor e cai para o mais barato se falhar. <strong>Recomendado</strong> para testes.
+                  💡 <strong>Auto</strong> tenta os modelos disponíveis, do mais avançado ao mais econômico.
                 </p>
               </div>
 

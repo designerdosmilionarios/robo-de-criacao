@@ -28,7 +28,7 @@ interface FontManagerProps {
   isOpen: boolean;
   onClose: () => void;
   localFonts: LocalFont[];
-  onAddFont: (font: LocalFont) => void;
+  onAddFont: (font: LocalFont) => void | Promise<void>;
   onRemoveFont: (family: string) => void;
   activeFont: string;
   onSelectFont: (family: string) => void;
@@ -189,7 +189,7 @@ export const FontManager: React.FC<FontManagerProps> = ({
             continue;
           }
 
-          onAddFont({ family, base64, format, weight, italic });
+          await onAddFont({ family, base64, format, weight, italic });
           const msg = `✅ ${family} (${weight}${italic ? ' italic' : ''}) - ${estimateSize(base64)}KB`;
           setImportLog((prev) => [...prev, msg]);
           successCount++;
@@ -263,7 +263,7 @@ export const FontManager: React.FC<FontManagerProps> = ({
         }
 
         try {
-          onAddFont({
+          await onAddFont({
             family: f.family,
             base64: f.base64,
             format: f.format,

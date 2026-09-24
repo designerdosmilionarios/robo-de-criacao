@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Endpoint dedicado para o Mestre dos Prompts (equivalente ao Genos do Gravyx).
-// Usa a API de chat (gpt-image ou gpt-4) para gerar prompts otimizados de imagem.
+// Endpoint dedicado para prompts de imagem e variacoes de copy.
 
 async function callOpenAIChat(key: string, systemPrompt: string, userMessage: string) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -28,7 +27,7 @@ async function callOpenAIChat(key: string, systemPrompt: string, userMessage: st
 
 const SYSTEM_PROMPT = `Voce e o "Mestre dos Prompts", um diretor de arte senior especializado em criar prompts perfeitos para geracao de imagens publicitarias com IA.
 
-OBJETIVO: receber uma descricao curta do usuario (em portugues ou ingles) e transformar em um prompt profissional de imagem em INGLES, otimizado para modelos como Opus 4.8-image-1, gpt-image-2.5, DALL-E 3, ou Opus 4.8 Nano Banana Pro.
+OBJETIVO: receber uma descricao curta do usuario (em portugues ou ingles) e transformar em um prompt profissional de imagem em INGLES, otimizado para modelos de geracao de imagem.
 
 REGRAS:
 1. SEMPRE retorne o prompt em INGLES, mesmo que o usuario fale em portugues.
@@ -41,6 +40,13 @@ REGRAS:
 
 Exemplo de saida ideal:
 "Cinematic commercial product photography of a premium smartphone floating mid-air, soft volumetric lighting with cyan and gold rim lights, dark gradient background transitioning from deep navy to black, ultra-detailed 8k render, shallow depth of field, editorial magazine aesthetic, shot on Canon EOS R5 35mm f/1.4, dramatic reflections on glossy surface, single cohesive scene with negative space on the right for text overlay. Avoid: text, words, letters, watermarks, blurry, distorted anatomy, extra fingers, ugly artifacts."`;
+
+const COPY_SYSTEM_PROMPT = `Voce e um redator publicitario senior especializado em anuncios de performance.
+
+Crie exatamente 4 variacoes curtas e distintas a partir do briefing recebido.
+Cada variacao deve ocupar uma unica linha no formato: HEADLINE | DESTAQUE | CTA
+Escreva em portugues do Brasil, respeite o tom solicitado e evite promessas nao comprovadas.
+Nao use numeracao, marcadores, titulos, explicacoes ou markdown.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,11 +80,17 @@ export async function POST(req: NextRequest) {
     }
 
     const userMessage =
-      type === 'briefing'
+      type === 'copy'
+        ? `Crie 4 variacoes de copy para este anuncio: ${brief}`
+        : type === 'briefing'
         ? `Crie um prompt de imagem profissional para: ${brief}. Retorne APENAS o prompt em ingles.`
         : `Melhore este prompt de imagem publicitaria, adicionando detalhes tecnicos, iluminacao cinematica, composicao profissional e negative prompts. Prompt original: "${brief}". Retorne APENAS o prompt melhorado em ingles.`;
 
-    const response = await callOpenAIChat(key, SYSTEM_PROMPT, userMessage);
+    const response = await callOpenAIChat(
+      key,
+      type === 'copy' ? COPY_SYSTEM_PROMPT : SYSTEM_PROMPT,
+      userMessage
+    );
     const data = await response.json();
 
     if (!response.ok) {
