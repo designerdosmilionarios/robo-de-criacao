@@ -37,6 +37,7 @@ import {
   buildTextStyle,
   buildContainerStyle,
 } from '@/components/TypographyControl';
+import { FreeCanvasEditor, CanvasLayer } from '@/components/FreeCanvasEditor';
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -194,6 +195,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     useUppercase: true,
     letterSpacing: 0.5,
   });
+
+  // MODO DE EDICAO: 'auto' = layout pre-definido | 'free' = posicionamento livre
+  const [editMode, setEditMode] = useState<'auto' | 'free'>('auto');
+  const [freeLayers, setFreeLayers] = useState<CanvasLayer[]>([]);
 
   // Galeria de imagens geradas
   const [generatedGallery, setGeneratedGallery] = useState<string[]>([]);
@@ -648,6 +653,26 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </p>
         </div>
 
+        {/* Toggle: Modo Auto / Livre */}
+        <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 self-start md:self-auto">
+          <button
+            onClick={() => setEditMode('auto')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              editMode === 'auto' ? 'bg-brand-500 text-dark-900 shadow-md' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            🎯 Layout Auto
+          </button>
+          <button
+            onClick={() => setEditMode('free')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              editMode === 'free' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            ✏️ Editor Livre
+          </button>
+        </div>
+
         {/* Seletor de Formato */}
         <div className="flex items-center gap-1.5 bg-white/5 p-1.5 rounded-2xl border border-white/10 self-start md:self-auto flex-wrap">
           {(['4:5', '1:1', '9:16', '16:9'] as const).map((f) => (
@@ -672,12 +697,25 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         {/* COLUNA ESQUERDA: CANVAS PREVIEW (8 COLS - maior para melhor visualizacao) */}
         <div className="xl:col-span-8 flex flex-col items-center">
           <div className="w-full max-w-[680px]">
-            {/* O CANVAS RENDERIZADO - com background cinza claro para visualização real */}
-            <div
-              id="single-creative-canvas"
-              className={`relative w-full ${currentFormat.className} overflow-hidden rounded-2xl shadow-2xl border-2 border-white/20 select-none`}
-              style={{
-                backgroundColor: '#f0f0f0', // Fundo cinza para visualização real (contraste com a página escura)
+            {editMode === 'free' ? (
+              // MODO LIVRE: Editor com posicionamento livre de camadas
+              <FreeCanvasEditor
+                initialLayers={freeLayers}
+                backgroundImage={bgImage}
+                canvasAspectRatio={format.replace(':', '/')}
+                onChange={setFreeLayers}
+                localFonts={localFonts}
+                defaultFontFamily={brand.fontHeadline}
+              />
+            ) : (
+              // MODO AUTO: Layout pre-definido (canvas atual)
+              <>
+                {/* O CANVAS RENDERIZADO - com background cinza claro para visualização real */}
+                <div
+                  id="single-creative-canvas"
+                  className={`relative w-full ${currentFormat.className} overflow-hidden rounded-2xl shadow-2xl border-2 border-white/20 select-none`}
+                  style={{
+                    backgroundColor: '#f0f0f0', // Fundo cinza para visualização real (contraste com a página escura)
                 color: brand.textColor,
                 fontFamily: brand.fontBody,
               }}
@@ -976,6 +1014,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
             </div>
+              </>
+            )}
 
             {/* BOTÕES DE AÇÃO: SALVAR + BAIXAR */}
             <div className="mt-5 grid grid-cols-2 gap-2.5">
