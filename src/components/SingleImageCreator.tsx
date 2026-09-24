@@ -829,61 +829,15 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </>
               )}
 
-              {/* CAMADA 4: LOGO DO CLIENTE / MARCA - arrastável e selecionável */}
+              {/* CAMADA 4: LOGO DO CLIENTE / MARCA - posicionado via sliders X/Y */}
               {logoImage && (
                 <div
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    setSelectedCanvasEl('logo');
-                    const canvas = (e.currentTarget.closest('[id="single-creative-canvas"]') as HTMLElement);
-                    if (!canvas) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const startX = e.clientX - rect.left;
-                    const startY = e.clientY - rect.top;
-                    const origX = logoXY
-                      ? (logoXY.x / 100) * rect.width
-                      : logoPosition.includes('left')
-                        ? 0
-                        : logoPosition.includes('right')
-                        ? rect.width
-                        : rect.width / 2;
-                    const origY = logoXY
-                      ? (logoXY.y / 100) * rect.height
-                      : logoPosition.includes('top')
-                        ? 0
-                        : logoPosition.includes('bottom')
-                        ? rect.height
-                        : rect.height / 2;
-
-                    const handleMove = (ev: MouseEvent) => {
-                      const dx = ev.clientX - rect.left - startX;
-                      const dy = ev.clientY - rect.top - startY;
-                      const newX = Math.max(0, Math.min(100, ((origX + dx) / rect.width) * 100));
-                      const newY = Math.max(0, Math.min(100, ((origY + dy) / rect.height) * 100));
-                      setLogoXY({ x: newX, y: newY });
-                    };
-                    const handleUp = () => {
-                      window.removeEventListener('mousemove', handleMove);
-                      window.removeEventListener('mouseup', handleUp);
-                    };
-                    window.addEventListener('mousemove', handleMove);
-                    window.addEventListener('mouseup', handleUp);
-                  }}
-                  className={`absolute z-30 p-6 sm:p-8 cursor-move transition-all ${
-                    selectedCanvasEl === 'logo'
-                      ? 'outline outline-2 outline-emerald-400 outline-offset-[-8px]'
-                      : ''
-                  }`}
+                  className={`absolute z-30 p-6 sm:p-8 ${selectedCanvasEl === 'logo' ? 'outline outline-2 outline-emerald-400 outline-offset-[-8px]' : ''}`}
                   style={{
-                    left: logoXY ? `${logoXY.x}%` : (logoPosition.includes('left') ? '0' : logoPosition.includes('right') ? 'auto' : '50%'),
-                    right: !logoXY && logoPosition.includes('right') ? '0' : 'auto',
-                    top: logoXY ? `${logoXY.y}%` : (logoPosition.includes('top') ? '0' : logoPosition.includes('bottom') ? 'auto' : '50%'),
-                    bottom: !logoXY && logoPosition.includes('bottom') ? '0' : 'auto',
-                    transform: logoXY
-                      ? 'translate(-50%, -50%)'
-                      : logoPosition.includes('center')
-                      ? 'translate(-50%, -50%)'
-                      : '',
+                    left: `${logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50)}%`,
+                    right: 'auto',
+                    top: `${logoXY?.y ?? (logoPosition.includes('top') ? 0 : logoPosition.includes('bottom') ? 100 : 50)}%`,
+                    transform: 'translate(-50%, -50%)',
                   }}
                 >
                   <img
@@ -904,23 +858,19 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
 
-              {/* CAMADA 5: PESSOA REAL */}
+              {/* CAMADA 5: PESSOA REAL - com posicao livre via sliders */}
               {personImage && (
                 <div
-                  className={`absolute pointer-events-none transition-all duration-200 z-10 ${
-                    personPosition === 'right'
-                      ? 'right-0'
-                      : personPosition === 'left'
-                      ? 'left-0'
-                      : 'left-1/2 -translate-x-1/2'
-                  }`}
+                  className="absolute pointer-events-none transition-all duration-200 z-10"
                   style={{
-                    bottom: `${personBottomOffset}px`,
+                    bottom: `${personXY?.y ?? personBottomOffset}%`,
+                    left: personXY ? `${personXY.x}%` : (personPosition === 'right' ? 'auto' : '0'),
+                    right: personXY ? 'auto' : (personPosition === 'right' ? '0' : 'auto'),
+                    transform: personXY
+                      ? `translateX(-50%) ${personFlipped ? 'scaleX(-1)' : ''}`
+                      : `${personPosition === 'center' ? 'translateX(-50%)' : ''} ${personFlipped ? 'scaleX(-1)' : ''}`,
                     width: `${personScale}%`,
                     maxWidth: format === '16:9' ? '55%' : '85%',
-                    transform: `${personPosition === 'center' ? 'translateX(-50%)' : ''} ${
-                      personFlipped ? 'scaleX(-1)' : ''
-                    }`,
                   }}
                 >
                   {/* Glow atrás da pessoa */}
@@ -1250,26 +1200,31 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   </button>
                 </div>
 
-                {/* Posição do Logo - 9 opcoes (grid 3x3) */}
+                {/* Posição do Logo - Grid 3x3 + Slider livre X/Y */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-gray-400 mb-1">Posição do Logo (9 opções)</label>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <label className="block text-[11px] font-semibold text-gray-400 mb-1.5">Posição do Logo</label>
+                  {/* Grid 3x3 de atalhos */}
+                  <div className="grid grid-cols-3 gap-1 mb-2">
                     {[
                       { id: 'top-left', label: '↖ Sup Esq' },
-                      { id: 'top-center', label: '↑ Topo Centro' },
+                      { id: 'top-center', label: '↑ Topo' },
                       { id: 'top-right', label: '↗ Sup Dir' },
-                      { id: 'middle-left', label: '← Meio Esq' },
+                      { id: 'middle-left', label: '← Esquerda' },
                       { id: 'middle-center', label: '● Centro' },
-                      { id: 'middle-right', label: '→ Meio Dir' },
+                      { id: 'middle-right', label: '→ Direita' },
                       { id: 'bottom-left', label: '↙ Inf Esq' },
-                      { id: 'bottom-center', label: '↓ Base Centro' },
+                      { id: 'bottom-center', label: '↓ Base' },
                       { id: 'bottom-right', label: '↘ Inf Dir' },
                     ].map((pos) => (
                       <button
                         key={pos.id}
-                        onClick={() => setLogoPosition(pos.id as any)}
-                        className={`py-1.5 px-1 rounded-lg text-[10px] font-semibold border transition-all ${
-                          logoPosition === pos.id
+                        onClick={() => {
+                          setLogoPosition(pos.id as any);
+                          // Reset XY customizado quando usar preset
+                          setLogoXY(null);
+                        }}
+                        className={`py-1.5 px-1 rounded-lg text-[9px] font-semibold border transition-all ${
+                          logoPosition === pos.id && !logoXY
                             ? 'bg-amber-400/20 border-amber-400 text-amber-300'
                             : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
                         }`}
@@ -1278,22 +1233,58 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Tamanho do Logo */}
-                <div>
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400 mb-1">
-                    <span>Tamanho do Logo</span>
-                    <span>{logoScale}%</span>
+                  {/* Slider livre X/Y */}
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                      <div className="flex items-center justify-between text-[9px] font-bold text-gray-400 mb-0.5">
+                        <span>X (horizontal)</span>
+                        <span>{Math.round(logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50))}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50)}
+                        onChange={(e) => {
+                          const x = Number(e.target.value);
+                          setLogoXY((prev) => ({ x, y: prev?.y ?? 50 }));
+                        }}
+                        className="w-full accent-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-[9px] font-bold text-gray-400 mb-0.5">
+                        <span>Y (vertical)</span>
+                        <span>{Math.round(logoXY?.y ?? (logoPosition.includes('top') ? 0 : logoPosition.includes('bottom') ? 100 : 50))}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={logoXY?.y ?? (logoPosition.includes('top') ? 0 : logoPosition.includes('bottom') ? 100 : 50)}
+                        onChange={(e) => {
+                          const y = Number(e.target.value);
+                          setLogoXY((prev) => ({ x: prev?.x ?? 50, y }));
+                        }}
+                        className="w-full accent-amber-500"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="50"
-                    max="180"
-                    value={logoScale}
-                    onChange={(e) => setLogoScale(Number(e.target.value))}
-                    className="w-full accent-amber-500"
-                  />
+                  {/* Slider de tamanho */}
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400 mb-1">
+                      <span>Tamanho do Logo</span>
+                      <span>{logoScale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="50"
+                      max="180"
+                      value={logoScale}
+                      onChange={(e) => setLogoScale(Number(e.target.value))}
+                      className="w-full accent-amber-500"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -1552,9 +1543,12 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   {(['left', 'center', 'right'] as const).map((pos) => (
                     <button
                       key={pos}
-                      onClick={() => setPersonPosition(pos)}
+                      onClick={() => {
+                        setPersonPosition(pos);
+                        setPersonXY(null);
+                      }}
                       className={`py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                        personPosition === pos
+                        personPosition === pos && !personXY
                           ? 'bg-brand-500/20 border-brand-500 text-brand-400'
                           : 'bg-white/5 border-white/10 text-gray-400'
                       }`}
@@ -1564,6 +1558,25 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       {pos === 'right' && 'Direita'}
                     </button>
                   ))}
+                </div>
+
+                {/* Slider livre X (posicao horizontal) */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mb-1">
+                    <span>Posição Horizontal (X)</span>
+                    <span>{Math.round(personXY?.x ?? (personPosition === 'left' ? 0 : personPosition === 'right' ? 100 : 50))}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={personXY?.x ?? (personPosition === 'left' ? 0 : personPosition === 'right' ? 100 : 50)}
+                    onChange={(e) => {
+                      const x = Number(e.target.value);
+                      setPersonXY((prev) => ({ x, y: prev?.y ?? 100 }));
+                    }}
+                    className="w-full accent-brand-500"
+                  />
                 </div>
 
                 {/* Slider de Escala / Tamanho */}
