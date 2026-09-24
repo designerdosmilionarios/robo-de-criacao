@@ -104,8 +104,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [textBlockXY, setTextBlockXY] = useState<{ x: number; y: number }>({ x: 50, y: 80 });
 
   // Posicao X/Y individual para cada texto (em %)
-  const [tagPos, setTagPos] = useState<{ x: number; y: number } | null>(null);
-  const [headlinePos, setHeadlinePos] = useState<{ x: number; y: number } | null>(null);
+  const [tagPos, setTagPos] = usePersistedState<{ x: number; y: number } | null>('single_tag_pos', null);
+  const [headlinePos, setHeadlinePos] = usePersistedState<{ x: number; y: number } | null>('single_headline_pos', null);
+  const [highlightPos, setHighlightPos] = usePersistedState<{ x: number; y: number } | null>('single_highlight_pos', null);
+  const [sublinePos, setSublinePos] = usePersistedState<{ x: number; y: number } | null>('single_subline_pos', null);
+  const [ctaPos, setCtaPos] = usePersistedState<{ x: number; y: number } | null>('single_cta_pos', null);
 
   // MODO VARIAÇÕES EM MASSA
   const [variationsCount, setVariationsCount] = useState<number>(4);
@@ -1030,12 +1033,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       </h1>
                     )}
 
-                    {/* FRASE DE DESTAQUE */}
+                    {/* FRASE DE DESTAQUE - com posicao X/Y */}
                     {highlightConfig.visible && highlightText && (
                       <p
                         style={{
                           ...buildTextStyle(highlightConfig),
                           margin: 0,
+                          position: highlightPos ? 'absolute' : 'static',
+                          left: highlightPos ? `${highlightPos.x}%` : undefined,
+                          top: highlightPos ? `${highlightPos.y}%` : undefined,
+                          transform: highlightPos ? 'translate(-50%, -50%)' : undefined,
                           fontSize: `${
                             format === '16:9'
                               ? highlightConfig.fontSize * 0.85
@@ -1048,18 +1055,23 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                           borderRadius: highlightConfig.highlightEnabled ? `${highlightConfig.highlightBorderRadius}px` : '0',
                           display: highlightConfig.highlightEnabled ? 'inline-block' : 'inline',
                           width: highlightConfig.highlightEnabled ? 'fit-content' : 'auto',
+                          maxWidth: '90%',
                         }}
                       >
                         {highlightText}
                       </p>
                     )}
 
-                    {/* SUBTITULO */}
+                    {/* SUBTITULO - com posicao X/Y */}
                     {sublineConfig.visible && subline && (
                       <p
                         style={{
                           ...buildTextStyle(sublineConfig),
                           margin: 0,
+                          position: sublinePos ? 'absolute' : 'static',
+                          left: sublinePos ? `${sublinePos.x}%` : undefined,
+                          top: sublinePos ? `${sublinePos.y}%` : undefined,
+                          transform: sublinePos ? 'translate(-50%, -50%)' : undefined,
                           fontSize: `${
                             format === '16:9'
                               ? sublineConfig.fontSize * 0.85
@@ -1082,7 +1094,15 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
 
                     {/* CTA */}
                     {showCta && ctaText && ctaConfig.visible && (
-                      <div className={ctaConfig.textAlign === 'center' ? 'self-center' : ctaConfig.textAlign === 'right' ? 'self-end' : 'self-start'}>
+                      <div
+                        className="inline-flex"
+                        style={{
+                          position: ctaPos ? 'absolute' : 'static',
+                          left: ctaPos ? `${ctaPos.x}%` : undefined,
+                          top: ctaPos ? `${ctaPos.y}%` : undefined,
+                          transform: ctaPos ? 'translate(-50%, -50%)' : undefined,
+                        }}
+                      >
                         <span
                           className="inline-flex items-center gap-2 transition-all"
                           style={{
@@ -1210,13 +1230,55 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   {headlineConfig.visible && headline && (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-emerald-300 uppercase">Bloco de Textos</span>
+                        <span className="text-[10px] font-bold text-emerald-300 uppercase">Headline</span>
                         <button onClick={() => setHeadlinePos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
                       </div>
                       <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(headlinePos?.x ?? 50)}%</span></div>
-                      <input type="range" min="0" max="100" value={headlinePos?.x ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 80 }))} className="w-full accent-emerald-500" />
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(headlinePos?.y ?? 80)}%</span></div>
-                      <input type="range" min="0" max="100" value={headlinePos?.y ?? 80} onChange={(e) => setHeadlinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-emerald-500" />
+                      <input type="range" min="0" max="100" value={headlinePos?.x ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 50 }))} className="w-full accent-emerald-500" />
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(headlinePos?.y ?? 50)}%</span></div>
+                      <input type="range" min="0" max="100" value={headlinePos?.y ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-emerald-500" />
+                    </div>
+                  )}
+
+                  {/* Destaque */}
+                  {highlightConfig.visible && highlightText && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-fuchsia-300 uppercase">Destaque</span>
+                        <button onClick={() => setHighlightPos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(highlightPos?.x ?? 50)}%</span></div>
+                      <input type="range" min="0" max="100" value={highlightPos?.x ?? 50} onChange={(e) => setHighlightPos((p) => ({ x: Number(e.target.value), y: p?.y ?? 60 }))} className="w-full accent-fuchsia-500" />
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(highlightPos?.y ?? 60)}%</span></div>
+                      <input type="range" min="0" max="100" value={highlightPos?.y ?? 60} onChange={(e) => setHighlightPos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-fuchsia-500" />
+                    </div>
+                  )}
+
+                  {/* Subtítulo */}
+                  {sublineConfig.visible && subline && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-cyan-300 uppercase">Subtítulo</span>
+                        <button onClick={() => setSublinePos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(sublinePos?.x ?? 50)}%</span></div>
+                      <input type="range" min="0" max="100" value={sublinePos?.x ?? 50} onChange={(e) => setSublinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 70 }))} className="w-full accent-cyan-500" />
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(sublinePos?.y ?? 70)}%</span></div>
+                      <input type="range" min="0" max="100" value={sublinePos?.y ?? 70} onChange={(e) => setSublinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-cyan-500" />
+                    </div>
+                  )}
+
+                  {/* CTA */}
+                  {showCta && ctaText && ctaConfig.visible && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-rose-300 uppercase">CTA (botão)</span>
+                        <button onClick={() => setCtaPos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(ctaPos?.x ?? 50)}%</span></div>
+                      <input type="range" min="0" max="100" value={ctaPos?.x ?? 50} onChange={(e) => setCtaPos((p) => ({ x: Number(e.target.value), y: p?.y ?? 90 }))} className="w-full accent-rose-500" />
+                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(ctaPos?.y ?? 90)}%</span></div>
+                      <input type="range" min="0" max="100" value={ctaPos?.y ?? 90} onChange={(e) => setCtaPos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-rose-500" />
                     </div>
                   )}
                 </div>
