@@ -175,11 +175,13 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
         .filter(Boolean)
         .join(' ');
 
-      const endpoint = provider === 'Opus 4.8' ? '/api/generate-claude-image' : '/api/generate-image';
+      const endpoint = provider === 'Opus 4.8' ? '/api/generate-image' : '/api/generate-image';
 
       const requestBody: any = {
         prompt: fullPrompt,
         size: '1024x1024',
+        aspectRatio: '1:1',
+        provider: provider === 'Opus 4.8' ? 'Opus 4.8' : 'openai',
         apiKey,
       };
 
