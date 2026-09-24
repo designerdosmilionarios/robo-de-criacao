@@ -140,11 +140,26 @@ export async function POST(req: NextRequest) {
   try {
     const { prompt, size = '1024x1024', apiKey, aspectRatio, provider: providerHint } = await req.json();
 
-    const key = apiKey || process.env.OPENAI_API_KEY;
+    // Sanitiza a chave: remove espaços, quebras de linha, aspas e caracteres invisíveis
+    const key = String(apiKey || process.env.OPENAI_API_KEY || '')
+      .replace(/[\s\r\n\t]+/g, '')
+      .replace(/['"`]/g, '')
+      .trim();
 
     if (!key) {
       return NextResponse.json(
         { error: 'Chave de API não configurada. Insira sua chave nas Configurações do Studio.' },
+        { status: 400 }
+      );
+    }
+
+    // Validação mínima da chave: começa com prefixo conhecido
+    const validPrefixes = ['AIza', 'sk-ant-', 'sk-proj-', 'sk-', 'ya29.'];
+    if (!validPrefixes.some((p) => key.startsWith(p))) {
+      return NextResponse.json(
+        {
+          error: `Chave de API inválida. Detectado provider "${detectProvider(key)}". Chaves válidas começam com: AIza (Opus 4.8), sk-ant- (Anthropic), sk-proj- ou sk- (OpenAI). Sua chave começa com "${key.substring(0, 6)}...".`,
+        },
         { status: 400 }
       );
     }

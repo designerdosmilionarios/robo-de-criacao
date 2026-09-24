@@ -50,11 +50,17 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     setImgError(null);
 
     try {
-      const endpoint = provider === 'Opus 4.8' ? '/api/generate-claude-image' : '/api/generate-image';
+      const endpoint = '/api/generate-image';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptToUse, apiKey, size: '1024x1024' }),
+        body: JSON.stringify({
+          prompt: promptToUse,
+          apiKey,
+          size: '1024x1024',
+          aspectRatio: '1:1',
+          provider: provider === 'Opus 4.8' ? 'Opus 4.8' : 'openai',
+        }),
       });
       const data = await res.json();
       if (!res.ok) {

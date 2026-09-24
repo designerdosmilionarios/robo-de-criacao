@@ -286,7 +286,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     setBgError(null);
 
     try {
-      const endpoint = provider === 'Opus 4.8' ? '/api/generate-claude-image' : '/api/generate-image';
+      const endpoint = '/api/generate-image';
       const sizeMap = {
         '16:9': '1920x1080',
         '9:16': '1080x1920',
@@ -297,6 +297,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       const requestBody: any = {
         prompt: bgPrompt || 'premium dark cinematic background for advertising',
         size: sizeMap[format],
+        aspectRatio: format, // passa o aspect ratio desejado (1:1, 4:5, 9:16, 16:9)
+        provider: provider === 'Opus 4.8' ? 'Opus 4.8' : 'openai',
         apiKey,
       };
 
