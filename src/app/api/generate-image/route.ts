@@ -217,7 +217,14 @@ export async function POST(req: NextRequest) {
       }
 
       const modelAttempts = [
+        { name: 'gpt-image-2.5-sunburst', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-2.5-flare', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-2.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-2', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-1.5', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
         { name: 'gpt-image-1', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
+        { name: 'gpt-image-1-mini', size: '1024x1024' },
+        { name: 'chatgpt-image-latest', size: requestedSize === '1792x1024' ? '1536x1024' : requestedSize === '1024x1792' ? '1024x1536' : requestedSize },
         { name: 'dall-e-3', size: requestedSize },
         { name: 'dall-e-2', size: '1024x1024' },
       ];
