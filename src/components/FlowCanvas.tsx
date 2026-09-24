@@ -219,6 +219,16 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     };
   }, [draggingBlock]);
 
+  // Listener de ESC para cancelar conexao em progresso
+  useEffect(() => {
+    if (!connecting) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConnecting(null);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [connecting]);
+
   // Conectar blocos
   const handleConnectClick = (blockId: string) => {
     if (!connecting) {
@@ -449,9 +459,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                         e.stopPropagation();
                         handleConnectClick(block.id);
                       }}
-                      className={`w-2 h-2 rounded-full ${config.color.replace('text', 'bg')} hover:scale-150 transition-transform`}
-                      title="Conectar a outro bloco"
-                    />
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all ${
+                        connecting === block.id
+                          ? 'bg-emerald-500 text-white animate-pulse ring-2 ring-emerald-300'
+                          : `${config.color.replace('text', 'bg')} ${config.color} hover:scale-110`
+                      }`}
+                      title="Clique para iniciar uma conexão deste bloco"
+                    >
+                      {connecting === block.id ? '✓' : '🔌 Saída'}
+                    </button>
                   )}
                   {isOutput && (
                     <button
@@ -679,16 +695,22 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
-                {/* Ponto de conexao na esquerda (input) para outputs */}
+                {/* Ponto de conexao na esquerda (input) para outputs - MAIOR e mais visivel */}
                 {isOutput && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleConnectClick(block.id);
                     }}
-                    className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0b10] hover:scale-125 transition-transform"
-                    title="Ponto de entrada - conecte um bloco aqui"
-                  />
+                    className={`absolute -left-3 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all border-2 border-[#0a0b10] ${
+                      connecting === block.id
+                        ? 'bg-emerald-500 text-white animate-pulse ring-2 ring-emerald-300'
+                        : 'bg-emerald-500/80 text-white hover:bg-emerald-400 hover:scale-110 shadow-lg'
+                    }`}
+                    title="Clique para receber uma conexão"
+                  >
+                    {connecting === block.id ? '✓ Conectando' : '📥 Entrada'}
+                  </button>
                 )}
               </div>
             </div>
@@ -697,9 +719,27 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
         {/* Status de conexao em progresso */}
         {connecting && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
-            Clique em outro bloco para conectar (ESC para cancelar)
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-100 text-xs font-bold shadow-xl animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            Clique no botão <span className="px-1.5 py-0.5 bg-emerald-500 text-white rounded text-[9px]">📥 ENTRADA</span> do bloco de destino
+            <button
+              onClick={() => setConnecting(null)}
+              className="ml-2 px-2 py-0.5 bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-100 rounded text-[10px]"
+            >
+              Cancelar (ESC)
+            </button>
           </div>
+        )}
+
+        {/* Botao de cancelar conexao (ESC) */}
+        {connecting && (
+          <div
+            className="fixed inset-0 z-30"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setConnecting(null);
+            }}
+            tabIndex={0}
+          />
         )}
       </div>
 
