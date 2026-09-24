@@ -317,6 +317,12 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
 
       setBgImage(data.imageUrl);
       setGeneratedGallery((prev) => [data.imageUrl, ...prev]);
+      // Log no console para fácil verificação de qual modelo foi usado
+      console.log(
+        `%c[Imagem gerada com sucesso]%c Modelo: ${data.modelUsed || 'desconhecido'} | Provider: ${data.provider || 'desconhecido'}`,
+        'background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;',
+        'color: #10b981;'
+      );
     } catch (err: any) {
       setBgError(err.message || 'Erro ao comunicar com a IA.');
     } finally {
