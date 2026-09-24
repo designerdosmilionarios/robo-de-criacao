@@ -861,11 +861,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     }}
                     draggable={false}
                   />
-                  {selectedCanvasEl === 'logo' && (
-                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-bold uppercase whitespace-nowrap">
-                      Logo - arraste para mover
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -910,38 +905,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
 
-              {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO (arrastável e selecionável) */}
+              {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO */}
               {showText && (
                 <div
-                  onMouseDown={(e) => {
-                    // Ignora se clicou em input/textarea
-                    if ((e.target as HTMLElement).closest('input, textarea, button')) return;
-                    e.stopPropagation();
-                    setSelectedCanvasEl('text');
-                    const canvas = (e.currentTarget.closest('[id="single-creative-canvas"]') as HTMLElement);
-                    if (!canvas) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const startX = e.clientX - rect.left;
-                    const startY = e.clientY - rect.top;
-
-                    const handleMove = (ev: MouseEvent) => {
-                      const dx = ev.clientX - rect.left - startX;
-                      const dy = ev.clientY - rect.top - startY;
-                      setTextBlockXY((prev) => ({
-                        x: Math.max(0, Math.min(100, prev.x + (dx / rect.width) * 100)),
-                        y: Math.max(0, Math.min(100, prev.y + (dy / rect.height) * 100)),
-                      }));
-                    };
-                    const handleUp = () => {
-                      window.removeEventListener('mousemove', handleMove);
-                      window.removeEventListener('mouseup', handleUp);
-                    };
-                    window.addEventListener('mousemove', handleMove);
-                    window.addEventListener('mouseup', handleUp);
-                  }}
-                  className={`relative z-20 w-full h-full p-6 sm:p-10 ${
-                    selectedCanvasEl === 'text' ? 'outline outline-2 outline-emerald-400 outline-offset-[-4px]' : ''
-                  }`}
+                  className="relative z-20 w-full h-full p-6 sm:p-10"
                   style={{
                     position: 'absolute',
                     left: 0,
@@ -953,11 +920,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       : {}),
                   }}
                 >
-                  {selectedCanvasEl === 'text' && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-bold uppercase whitespace-nowrap z-50 pointer-events-none">
-                      ✏️ Bloco de Textos - arraste para reposicionar
-                    </div>
-                  )}
                   <div
                     style={{
                       ...buildContainerStyle(
@@ -1226,7 +1188,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   </button>
                 </div>
 
-                {/* SEÇÃO: POSIÇÃO DOS TEXTOS (X/Y) */}
+                {/* SEÇÃO: POSIÇÃO DOS TEXTOS (X/Y) - SEMPRE VISÍVEL, INDEPENDENTE DO LOGO */}
                 <div className="pt-3 border-t border-white/5 space-y-3">
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     📍 Posição dos Textos no Canvas
