@@ -107,6 +107,9 @@ export interface SavedSingleImageData {
   gradientAngle: number;
   gradientOpacity: number;
   useGradient: boolean;
+  // Glows da marca
+  showBrandGlows: boolean;
+  glowIntensity: number;
   personImage: string | null;
   personPosition: 'right' | 'left' | 'center';
   personScale: number;

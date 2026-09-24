@@ -74,6 +74,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [gradientAngle, setGradientAngle] = useState(135);
   const [gradientOpacity, setGradientOpacity] = useState(100);
 
+  // Glows de marca (esferas coloridas desfocadas no fundo)
+  const [showBrandGlows, setShowBrandGlows] = useState(true);
+  const [glowIntensity, setGlowIntensity] = useState(35);
+
   // Imagem de Referência para a IA guiar o estilo
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
@@ -142,6 +146,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         gradientColor2,
         gradientAngle,
         gradientOpacity,
+        showBrandGlows,
+        glowIntensity,
         personImage,
         personPosition,
         personScale,
@@ -179,6 +185,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if (typeof data.gradientColor2 === 'string') setGradientColor2(data.gradientColor2);
         if (typeof data.gradientAngle === 'number') setGradientAngle(data.gradientAngle);
         if (typeof data.gradientOpacity === 'number') setGradientOpacity(data.gradientOpacity);
+        if (typeof data.showBrandGlows === 'boolean') setShowBrandGlows(data.showBrandGlows);
+        if (typeof data.glowIntensity === 'number') setGlowIntensity(data.glowIntensity);
         if ('personImage' in data) setPersonImage(data.personImage);
         if (data.personPosition) setPersonPosition(data.personPosition);
         if (typeof data.personScale === 'number') setPersonScale(data.personScale);
@@ -218,6 +226,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     gradientColor2,
     gradientAngle,
     gradientOpacity,
+    showBrandGlows,
+    glowIntensity,
     personImage,
     personPosition,
     personScale,
@@ -415,7 +425,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               id="single-creative-canvas"
               className={`relative w-full ${currentFormat.className} overflow-hidden rounded-2xl shadow-2xl border border-white/15 select-none`}
               style={{
-                backgroundColor: brand.backgroundColor,
+                backgroundColor: 'transparent', // Deixa o degradê/imagem controlada pelo usuário
                 color: brand.textColor,
                 fontFamily: brand.fontBody,
               }}
@@ -440,25 +450,32 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               )}
 
               {/* CAMADA 2: OVERLAY GRADIENTE PARA CONTRASTE */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background:
-                    textAlignment === 'left' && personPosition === 'right'
-                      ? `linear-gradient(to right, ${brand.backgroundColor}f2 0%, ${brand.backgroundColor}aa 45%, transparent 100%)`
-                      : `linear-gradient(to top, ${brand.backgroundColor}f2 0%, ${brand.backgroundColor}66 50%, transparent 100%)`,
-                }}
-              />
+              {/* Quando tem imagem de fundo, usa overlay escuro. Quando é só degradê, deixa transparente */}
+              {bgImage && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      textAlignment === 'left' && personPosition === 'right'
+                        ? `linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 45%, transparent 100%)`
+                        : `linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)`,
+                  }}
+                />
+              )}
 
-              {/* CAMADA 3: GLOWS DA MARCA */}
-              <div
-                className="absolute -top-24 -left-24 w-80 h-80 rounded-full blur-[100px] opacity-35 pointer-events-none"
-                style={{ backgroundColor: brand.primaryColor }}
-              />
-              <div
-                className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full blur-[100px] opacity-20 pointer-events-none"
-                style={{ backgroundColor: brand.secondaryColor }}
-              />
+              {/* CAMADA 3: GLOWS DA MARCA (opcional, com intensidade ajustável) */}
+              {showBrandGlows && (
+                <>
+                  <div
+                    className="absolute -top-24 -left-24 w-80 h-80 rounded-full blur-[100px] pointer-events-none"
+                    style={{ backgroundColor: brand.primaryColor, opacity: glowIntensity / 100 }}
+                  />
+                  <div
+                    className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full blur-[100px] pointer-events-none"
+                    style={{ backgroundColor: brand.secondaryColor, opacity: (glowIntensity / 100) * 0.6 }}
+                  />
+                </>
+              )}
 
               {/* CAMADA 4: LOGO DO CLIENTE / MARCA */}
               {logoImage && (
@@ -931,6 +948,40 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               <p className="text-[10px] text-gray-500 mt-1">
                 Use o degradê para preencher enquanto a IA gera a imagem, ou baixe com 100% opacidade.
               </p>
+            </div>
+
+            {/* Controle de Glows */}
+            <div className="pt-3 border-t border-white/5 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-gray-400 flex items-center gap-1.5">
+                  ✨ Glows da Marca
+                </label>
+                <input
+                  type="checkbox"
+                  checked={showBrandGlows}
+                  onChange={(e) => setShowBrandGlows(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-emerald-500"
+                />
+              </div>
+              {showBrandGlows && (
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 mb-1">
+                    <span>Intensidade dos Glows</span>
+                    <span>{glowIntensity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="80"
+                    value={glowIntensity}
+                    onChange={(e) => setGlowIntensity(Number(e.target.value))}
+                    className="w-full accent-emerald-500"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Reduza para 0% se quiser um fundo limpo sem cor da marca.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
