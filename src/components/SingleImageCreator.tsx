@@ -45,6 +45,8 @@ import { SmartTemplates, SmartTemplate, AVAILABLE_TEMPLATES } from '@/components
 import { usePersistedState } from '@/lib/usePersistedState';
 import { BackgroundImageControl, buildBackgroundImageStyle } from '@/components/BackgroundImageControl';
 
+const SUPPORTED_IMAGE_MODELS = ['auto', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2'];
+
 interface SingleImageCreatorProps {
   brand: BrandKit;
   apiKey: string;
@@ -87,6 +89,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [bgError, setBgError] = useState<string | null>(null);
   // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
   const [selectedModel, setSelectedModel] = usePersistedState<string>('single_model', 'auto');
+
+  useEffect(() => {
+    if (!SUPPORTED_IMAGE_MODELS.includes(selectedModel)) setSelectedModel('auto');
+  }, [selectedModel, setSelectedModel]);
 
   // Degradê customizado (PERSISTIDO)
   const [useGradient, setUseGradient] = usePersistedState<boolean>('single_use_gradient', true);
@@ -1158,7 +1164,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         </div>
 
         {/* COLUNA DIREITA: PAINEL DE EDIÇÃO (4 COLS) */}
-        <div className="xl:col-span-4 space-y-4 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:pr-2">
+        <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-28 xl:max-h-[calc(100vh-128px)] xl:overflow-y-auto xl:pr-2">
           {/* SEÇÃO INDEPENDENTE: POSIÇÃO INDIVIDUAL DOS TEXTOS (X/Y) */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -1245,25 +1251,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             </div>
           </div>
 
-          {/* SEÇÃO POSIÇÃO INDIVIDUAL DOS TEXTOS (X/Y) - SEMPRE VISÍVEL */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                Posição Individual dos Textos
-              </h3>
-            </div>
-            <div className="space-y-2">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-emerald-300">HEADLINE</span>
-                  <button onClick={() => setHeadlinePos(null)} className="text-[9px] text-gray-400">Reset</button>
-                </div>
-                <input type="range" min="0" max="100" value={headlinePos?.x ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 50 }))} className="w-full accent-emerald-500" />
-                <input type="range" min="0" max="100" value={headlinePos?.y ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-emerald-500" />
-              </div>
-            </div>
-          </div>
-
           {/* SEÇÃO 1: LOGO DO CLIENTE */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -1301,6 +1288,18 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] p-2.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <img src={logoImage} alt="Logo ativa" className="h-10 max-w-[110px] rounded bg-white/5 p-1 object-contain" />
+                    <span className="truncate text-xs font-medium text-gray-300">Logo ativa</span>
+                  </div>
+                  <button
+                    onClick={() => logoFileInputRef.current?.click()}
+                    className="text-xs font-semibold text-brand-400 hover:underline"
+                  >
+                    Trocar
+                  </button>
+                </div>
                 {/* Posição do Logo - Grid 3x3 + Slider livre X/Y */}
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-400 mb-1.5">Posição do Logo</label>
@@ -1390,94 +1389,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               </div>
             )}
           </div>
-
-                <div className="flex items-center gap-2.5">
-                    <img src={logoImage || ''} alt="logo preview" className="h-8 max-w-[90px] object-contain bg-white/5 rounded p-1" />
-                    <span className="text-xs text-gray-300 font-medium truncate max-w-[120px]">Logo ativa</span>
-                  </div>
-                  <button
-                    onClick={() => logoFileInputRef.current?.click()}
-                    className="text-xs text-brand-400 hover:underline font-semibold"
-                  >
-                    Trocar
-                  </button>
-                </div>
-
-                {/* SEÇÃO: POSIÇÃO DOS TEXTOS (X/Y) - SEMPRE VISÍVEL, INDEPENDENTE DO LOGO */}
-                <div className="pt-3 border-t border-white/5 space-y-3">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    📍 Posição dos Textos no Canvas
-                  </h4>
-
-                  {showTag && tag && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-amber-300 uppercase">Tag</span>
-                        <button onClick={() => setTagPos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
-                      </div>
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(tagPos?.x ?? 5)}%</span></div>
-                      <input type="range" min="0" max="100" value={tagPos?.x ?? 5} onChange={(e) => setTagPos((p) => ({ x: Number(e.target.value), y: p?.y ?? 5 }))} className="w-full accent-amber-500" />
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(tagPos?.y ?? 5)}%</span></div>
-                      <input type="range" min="0" max="100" value={tagPos?.y ?? 5} onChange={(e) => setTagPos((p) => ({ x: p?.x ?? 5, y: Number(e.target.value) }))} className="w-full accent-amber-500" />
-                    </div>
-                  )}
-
-                  {headlineConfig.visible && headline && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-emerald-300 uppercase">Headline</span>
-                        <button onClick={() => setHeadlinePos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
-                      </div>
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(headlinePos?.x ?? 50)}%</span></div>
-                      <input type="range" min="0" max="100" value={headlinePos?.x ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 50 }))} className="w-full accent-emerald-500" />
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(headlinePos?.y ?? 50)}%</span></div>
-                      <input type="range" min="0" max="100" value={headlinePos?.y ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-emerald-500" />
-                    </div>
-                  )}
-
-                  {/* Destaque */}
-                  {highlightConfig.visible && highlightText && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-fuchsia-300 uppercase">Destaque</span>
-                        <button onClick={() => setHighlightPos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
-                      </div>
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(highlightPos?.x ?? 50)}%</span></div>
-                      <input type="range" min="0" max="100" value={highlightPos?.x ?? 50} onChange={(e) => setHighlightPos((p) => ({ x: Number(e.target.value), y: p?.y ?? 60 }))} className="w-full accent-fuchsia-500" />
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(highlightPos?.y ?? 60)}%</span></div>
-                      <input type="range" min="0" max="100" value={highlightPos?.y ?? 60} onChange={(e) => setHighlightPos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-fuchsia-500" />
-                    </div>
-                  )}
-
-                  {/* Subtítulo */}
-                  {sublineConfig.visible && subline && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-cyan-300 uppercase">Subtítulo</span>
-                        <button onClick={() => setSublinePos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
-                      </div>
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(sublinePos?.x ?? 50)}%</span></div>
-                      <input type="range" min="0" max="100" value={sublinePos?.x ?? 50} onChange={(e) => setSublinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 70 }))} className="w-full accent-cyan-500" />
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(sublinePos?.y ?? 70)}%</span></div>
-                      <input type="range" min="0" max="100" value={sublinePos?.y ?? 70} onChange={(e) => setSublinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-cyan-500" />
-                    </div>
-                  )}
-
-                  {/* CTA */}
-                  {showCta && ctaText && ctaConfig.visible && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-rose-300 uppercase">CTA (botão)</span>
-                        <button onClick={() => setCtaPos(null)} className="text-[9px] text-gray-500 hover:text-white">↺ Resetar</button>
-                      </div>
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>X</span><span>{Math.round(ctaPos?.x ?? 50)}%</span></div>
-                      <input type="range" min="0" max="100" value={ctaPos?.x ?? 50} onChange={(e) => setCtaPos((p) => ({ x: Number(e.target.value), y: p?.y ?? 90 }))} className="w-full accent-rose-500" />
-                      <div className="flex items-center justify-between text-[9px] text-gray-400"><span>Y</span><span>{Math.round(ctaPos?.y ?? 90)}%</span></div>
-                      <input type="range" min="0" max="100" value={ctaPos?.y ?? 90} onChange={(e) => setCtaPos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-rose-500" />
-                    </div>
-                  )}
-                </div>
-
 
           {/* SEÇÃO 2: IMAGEM DE REFERÊNCIA VISUAL PARA A IA */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
@@ -1903,9 +1814,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   <option value="gpt-image-2" className="bg-[#11131a]">
                     ✨ GPT Image 2
                   </option>
-                  <option value="gpt-image-1" className="bg-[#11131a]">
-                    ↩ GPT Image 1 (compatibilidade)
-                  </option>
                 </select>
                 <p className="text-[10px] text-gray-500 mt-1">
                   💡 <strong>Auto</strong> tenta os modelos disponíveis, do mais avançado ao mais econômico.
@@ -2274,5 +2182,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
         </div>
       </div>
+    </div>
   );
 };

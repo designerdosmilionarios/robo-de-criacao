@@ -466,7 +466,7 @@ export default function Home() {
     <main className="min-h-screen pb-16">
       {/* NAVBAR SUPERIOR */}
       <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#07090e]/80 backdrop-blur-xl px-4 sm:px-8 py-3.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-[1600px] mx-auto grid grid-cols-[minmax(0,1fr)_auto] 2xl:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 2xl:gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center text-dark-900 font-extrabold shadow-lg shadow-brand-500/20">
               <Sparkles size={20} />
@@ -487,7 +487,8 @@ export default function Home() {
           </div>
 
           {/* ABAS */}
-          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 flex-wrap">
+          <div className="col-span-2 row-start-2 min-w-0 overflow-x-auto pb-0.5 2xl:col-span-1 2xl:col-start-2 2xl:row-start-1 2xl:pb-0">
+            <div className="flex w-max items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
             <button
               onClick={() => setActiveTab('single-image')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -544,10 +545,11 @@ export default function Home() {
             >
               <Type size={13} /> Fontes ({localFonts.length})
             </button>
+            </div>
           </div>
 
           {/* SELETOR DE CLIENTE + API */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 2xl:col-start-3">
             {/* Removido: Provider Switcher (só OpenAI agora) */}
 
             <button

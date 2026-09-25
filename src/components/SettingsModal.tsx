@@ -91,7 +91,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 text-sm font-mono focus:border-brand-500 focus:outline-none"
             />
             <p className="text-[11px] text-gray-500 mt-2">
-              Use a mesma chave da plataforma OpenAI. Funciona com gpt-image-1, gpt-image-2.5, DALL-E 3 e DALL-E 2.
+              Use a chave da plataforma OpenAI. A ferramenta prioriza GPT Image 2.5 Sunburst, Flare e GPT Image 2.
             </p>
           </div>
 

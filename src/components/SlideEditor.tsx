@@ -284,13 +284,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             <option value="auto" className="bg-[#11131a]">⭐ Auto (melhor → mais barato)</option>
             <option value="gpt-image-2.5-sunburst" className="bg-[#11131a]">💎 gpt-image-2.5-sunburst (Premium)</option>
             <option value="gpt-image-2.5-flare" className="bg-[#11131a]">⚡ gpt-image-2.5-flare (Rápido)</option>
-            <option value="gpt-image-2.5" className="bg-[#11131a]">🔷 gpt-image-2.5</option>
             <option value="gpt-image-2" className="bg-[#11131a]">🆕 gpt-image-2</option>
-            <option value="gpt-image-1.5" className="bg-[#11131a]">🌟 gpt-image-1.5</option>
-            <option value="gpt-image-1" className="bg-[#11131a]">✨ gpt-image-1 (Recomendado)</option>
-            <option value="gpt-image-1-mini" className="bg-[#11131a]">💰 gpt-image-1-mini (Econômico)</option>
-            <option value="dall-e-3" className="bg-[#11131a]">🎨 DALL-E 3</option>
-            <option value="dall-e-2" className="bg-[#11131a]">🏷️ DALL-E 2</option>
           </select>
 
           {imgError && (

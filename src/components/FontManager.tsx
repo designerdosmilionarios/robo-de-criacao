@@ -6,11 +6,7 @@ import {
   Trash2,
   Plus,
   Monitor,
-  Loader2,
-  HardDrive,
-  AlertCircle,
   Search,
-  Download,
   AlertTriangle,
   Info,
   X,
@@ -61,14 +57,6 @@ export const FontManager: React.FC<FontManagerProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importLog, setImportLog] = useState<string[]>([]);
-
-  // ESTADO DA IMPORTAÇÃO DO WINDOWS
-  const [isImportingSystem, setIsImportingSystem] = useState(false);
-  const [systemProgress, setSystemProgress] = useState<{ current: number; total: number } | null>(null);
-  const [systemError, setSystemError] = useState<string | null>(null);
-  const [systemSourceDir, setSystemSourceDir] = useState<string | null>(null);
-  const [systemSkipped, setSystemSkipped] = useState(0);
-  const [customFontPath, setCustomFontPath] = useState<string>('C:\\Windows\\Fonts');
 
   // ESTADO DE BUSCA
   const [fontSearch, setFontSearch] = useState('');
@@ -213,89 +201,6 @@ export const FontManager: React.FC<FontManagerProps> = ({
     }
   };
 
-  // ====== IMPORTAÇÃO DO WINDOWS (C:\Windows\Fonts) ======
-  const handleImportSystemFonts = async () => {
-    setIsImportingSystem(true);
-    setSystemError(null);
-    setSystemProgress({ current: 0, total: 0 });
-    setSystemSourceDir(null);
-    setSystemSkipped(0);
-
-    try {
-      const params = new URLSearchParams();
-      const trimmedPath = customFontPath.trim();
-      if (trimmedPath) params.set('path', trimmedPath);
-
-      const res = await fetch(`/api/list-system-fonts?${params.toString()}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao listar fontes do sistema.');
-      }
-
-      setSystemSourceDir(data.sourceDir);
-      const fonts: any[] = data.fonts || [];
-      const total = fonts.length;
-      setSystemProgress({ current: 0, total });
-
-      let imported = 0;
-      let skipped = 0;
-      let quotaError = false;
-
-      for (let i = 0; i < fonts.length; i++) {
-        const f = fonts[i];
-        if (!f.family) {
-          skipped++;
-          setSystemSkipped(skipped);
-          setSystemProgress({ current: i + 1, total });
-          continue;
-        }
-
-        // Pular duplicatas
-        const isDuplicate = localFonts.some(
-          (lf) => lf.family === f.family && lf.weight === f.weight && lf.italic === f.italic
-        );
-        if (isDuplicate) {
-          skipped++;
-          setSystemSkipped(skipped);
-          setSystemProgress({ current: i + 1, total });
-          continue;
-        }
-
-        try {
-          await onAddFont({
-            family: f.family,
-            base64: f.base64,
-            format: f.format,
-            weight: f.weight,
-            italic: f.italic,
-          });
-          imported++;
-        } catch (e: any) {
-          if (e?.name === 'QuotaExceededError' || e?.message?.includes('quota')) {
-            quotaError = true;
-            setSystemError(
-              `Limite de armazenamento atingido após ${imported} fontes. Remova algumas e tente novamente.`
-            );
-            break;
-          }
-          skipped++;
-          setSystemSkipped(skipped);
-        }
-        setSystemProgress({ current: i + 1, total });
-      }
-
-      if (!quotaError && imported > 0) {
-        // Sucesso - mensagem informativa
-        setSystemError(null);
-      }
-    } catch (err: any) {
-      setSystemError(err.message || 'Erro ao importar fontes do sistema.');
-    } finally {
-      setIsImportingSystem(false);
-    }
-  };
-
   const filteredFonts = localFonts.filter((f) =>
     f.family.toLowerCase().includes(fontSearch.toLowerCase())
   );
@@ -351,94 +256,11 @@ export const FontManager: React.FC<FontManagerProps> = ({
           </p>
         </div>
 
-        {/* BLOCO 1: IMPORTAÇÃO AUTOMÁTICA DO WINDOWS */}
-        <div className="mb-4 p-4 rounded-2xl bg-gradient-to-br from-brand-500/10 to-emerald-500/5 border border-brand-500/20 space-y-3">
-          <div className="flex items-center gap-2">
-            <HardDrive size={18} className="text-brand-400" />
-            <h3 className="text-sm font-bold text-white">Importar Fontes do Windows</h3>
-          </div>
-          <p className="text-[11px] text-gray-400 leading-relaxed">
-            Lê direto da pasta de fontes instaladas do seu sistema operacional e importa tudo em segundos.
-          </p>
-
-          {/* Campo para customizar o caminho */}
-          <div>
-            <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-              Caminho da pasta (padrão: C:\Windows\Fonts)
-            </label>
-            <input
-              type="text"
-              value={customFontPath}
-              onChange={(e) => setCustomFontPath(e.target.value)}
-              placeholder="C:\Windows\Fonts"
-              className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-mono focus:border-brand-500 focus:outline-none"
-            />
-          </div>
-
-          <button
-            onClick={handleImportSystemFonts}
-            disabled={isImportingSystem}
-            className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-lg shadow-brand-500/20 disabled:opacity-50"
-          >
-            {isImportingSystem ? (
-              <>
-                <Loader2 size={16} className="animate-spin" /> Importando...
-              </>
-            ) : (
-              <>
-                <Download size={16} /> Importar Fontes do Windows
-              </>
-            )}
-          </button>
-
-          {/* Progresso */}
-          {isImportingSystem && systemProgress && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] text-gray-400 font-semibold">
-                <span>
-                  {systemProgress.current} / {systemProgress.total} fontes
-                  {systemSkipped > 0 && ` (${systemSkipped} puladas)`}
-                </span>
-                <span>
-                  {systemProgress.total > 0
-                    ? Math.round((systemProgress.current / systemProgress.total) * 100)
-                    : 0}
-                  %
-                </span>
-              </div>
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-brand-500 to-emerald-400 transition-all"
-                  style={{
-                    width: `${systemProgress.total > 0 ? (systemProgress.current / systemProgress.total) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {systemSourceDir && !isImportingSystem && (
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <p className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5">
-                <Check size={13} /> Importação concluída de: <span className="font-mono text-gray-300">{systemSourceDir}</span>
-              </p>
-            </div>
-          )}
-
-          {systemError && (
-            <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-              <p className="text-xs text-red-300 font-medium flex items-start gap-1.5">
-                <AlertCircle size={13} className="mt-0.5 shrink-0" /> {systemError}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* BLOCO 2: UPLOAD MANUAL */}
+        {/* UPLOAD DE ARQUIVOS */}
         <div className="mb-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
           <div className="flex items-center gap-2">
             <Upload size={16} className="text-gray-400" />
-            <h3 className="text-sm font-bold text-white">Upload Manual de Arquivos</h3>
+            <h3 className="text-sm font-bold text-white">Adicionar arquivos de fonte</h3>
           </div>
 
           <input
@@ -530,13 +352,6 @@ export const FontManager: React.FC<FontManagerProps> = ({
               <br />
               → Não suportamos: <code className="bg-white/10 px-1 rounded">.eot</code>, <code className="bg-white/10 px-1 rounded">.svg</code> ou fontes em ZIP.
             </p>
-            <p>
-              <strong className="text-amber-300">❓ "Importar do Windows não funciona":</strong>
-              <br />
-              → Esse botão só funciona <strong>no seu PC local</strong> (não na Vercel).
-              <br />
-              → Para hospedagem (Vercel), use o <strong>Upload Manual</strong>.
-            </p>
           </div>
         </details>
 
@@ -567,7 +382,7 @@ export const FontManager: React.FC<FontManagerProps> = ({
               <Type size={32} className="text-gray-500 mx-auto mb-2" />
               <p className="text-sm text-gray-400 font-medium">Nenhuma fonte local importada ainda.</p>
               <p className="text-xs text-gray-500 mt-1">
-                Use o <strong>Upload Manual</strong> acima para subir arquivos .TTF, .OTF, .WOFF ou .WOFF2 do seu PC.
+                Use o botão acima para enviar arquivos .TTF, .OTF, .WOFF ou .WOFF2 do seu PC.
               </p>
             </div>
           ) : filteredFonts.length === 0 ? (

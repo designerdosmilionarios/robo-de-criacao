@@ -129,6 +129,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const referencesInputRef = useRef<HTMLInputElement>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Criar um novo bloco
@@ -151,39 +152,48 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     setConnections((prev) => prev.filter((c) => c.from !== id && c.to !== id));
   };
 
-  // Importar imagens da pasta REFERENCIAS como blocos
-  const handleImportReferences = async () => {
+  // Importar referencias escolhidas no navegador. Funciona localmente e na versao publicada.
+  const handleImportReferences = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setLoadingReferences(true);
     setReferencesError(null);
     try {
-      const res = await fetch('/api/list-references');
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao listar referencias.');
+      const selectedFiles = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+      const files = selectedFiles.slice(0, 30);
+      if (files.length === 0) {
+        throw new Error('Selecione pelo menos uma imagem válida.');
       }
-      // Criar um bloco de referencia para cada imagem retornada
-      const newBlocks: FlowBlock[] = (data.references || []).map((ref: any, i: number) => ({
+
+      const baseY = blocks.length > 0 ? Math.max(...blocks.map((block) => block.y + 190)) : 100;
+      const images = await Promise.all(
+        files.map(async (file) => ({
+          filename: file.name,
+          imageUrl: await optimizeImageDataUrl(await readFileAsDataUrl(file), 1280, 0.78),
+          sizeKB: Math.round(file.size / 1024),
+        }))
+      );
+      const newBlocks: FlowBlock[] = images.map((ref, i) => ({
         id: `ref-${Date.now()}-${i}`,
         type: 'reference' as BlockType,
         label: ref.filename.substring(0, 18),
         x: 50 + (i % 6) * 260,
-        y: 500 + Math.floor(i / 6) * 180,
+        y: baseY + Math.floor(i / 6) * 180,
         data: {
-          imageUrl: ref.base64 || null,
+          imageUrl: ref.imageUrl,
           filename: ref.filename,
           sizeKB: ref.sizeKB,
         },
       }));
       setBlocks((prev) => [...prev, ...newBlocks]);
-      if (data.truncated) {
+      if (selectedFiles.length > 30) {
         alert(
-          `Importamos ${newBlocks.length} imagens. A pasta tem ${data.total} arquivos no total - o sistema limita a 30 por importacao para nao travar. Use o botao "Referencia" individualmente para outras.`
+          `Importamos 30 imagens. Selecione as demais em uma nova importação para manter a esteira rápida.`
         );
       }
     } catch (err: any) {
       setReferencesError(err.message);
     } finally {
       setLoadingReferences(false);
+      event.target.value = '';
     }
   };
 
@@ -352,6 +362,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     }
   };
 
+  const canvasWidth = Math.max(1100, ...blocks.map((block) => block.x + 280));
+  const canvasHeight = Math.max(700, ...blocks.map((block) => block.y + 240));
+
   return (
     <div className="w-full bg-[#0a0b10] rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
       {/* BARRA DE FERRAMENTAS (topo) */}
@@ -378,14 +391,22 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           >
             <ImageIcon size={12} /> Referência
           </button>
+          <input
+            ref={referencesInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleImportReferences}
+          />
           <button
-            onClick={handleImportReferences}
+            onClick={() => referencesInputRef.current?.click()}
             disabled={loadingReferences}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 disabled:opacity-50"
-            title="Importa ate 30 imagens da pasta REFERENCIAS/ como blocos"
+            title="Seleciona até 30 imagens e cria um node para cada referência"
           >
             {loadingReferences ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-            Importar pasta
+            Importar imagens
           </button>
           <button
             onClick={() => handleCreateBlock('style')}
@@ -453,15 +474,18 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       </div>
 
       {/* AREA DO CANVAS (meio) */}
-      <div
-        ref={canvasRef}
-        className="relative w-full h-[700px] overflow-hidden bg-[#07090e]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)',
-          backgroundSize: '24px 24px',
-        }}
-      >
+      <div className="h-[700px] w-full overflow-auto bg-[#07090e]">
+        <div
+          ref={canvasRef}
+          className="relative bg-[#07090e]"
+          style={{
+            width: `${canvasWidth}px`,
+            height: `${canvasHeight}px`,
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)',
+            backgroundSize: '24px 24px',
+          }}
+        >
         {blocks.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center max-w-md">
@@ -829,6 +853,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* MODAL DE OUTPUT DETALHADO */}
@@ -923,6 +948,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 // =============================
 // HELPERS
 // =============================
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error(`Não foi possível ler ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
 
 function getDefaultLabel(type: BlockType): string {
   switch (type) {
