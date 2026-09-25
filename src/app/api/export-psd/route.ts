@@ -352,7 +352,7 @@ export async function POST(req: NextRequest) {
           top: 0,
           right: width,
           bottom: height,
-          image: finalPng,
+          imageData: { data: finalPng, width: 1, height: 1 },
         }],
       }));
 
@@ -370,7 +370,7 @@ export async function POST(req: NextRequest) {
           top: l.top,
           right: l.left + l.width,
           bottom: l.top + l.height,
-          image: l.png,
+          imageData: { data: l.png, width: 1, height: 1 },
         })),
       }));
     } catch (e) {
