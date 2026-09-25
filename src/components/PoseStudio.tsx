@@ -16,6 +16,7 @@ import {
   Plus,
   Image as ImageIcon,
   Save,
+  Search,
 } from 'lucide-react';
 import { usePersistedState } from '@/lib/usePersistedState';
 import { BrandKit } from '@/types';
@@ -172,6 +173,15 @@ const RESOLUTIONS = [
   { value: '1080x1350', label: '4:5 Feed IG Portrait (1080x1350)', for: '⭐ Instagram Feed Portrait' },
 ];
 
+// Pose customizada (usuário define o prompt)
+const CUSTOM_POSE = {
+  id: 'custom',
+  label: '✨ Prompt Personalizado',
+  desc: 'Escreva sua própria descrição de pose',
+  promptPart: '', // será preenchido pelo usuário
+  category: 'custom',
+};
+
 export const PoseStudio: React.FC<PoseStudioProps> = ({
   brand,
   apiKey,
@@ -187,6 +197,10 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
   const [faceImages, setFaceImages] = usePersistedState<string[]>('pose_face_images', []);
   const [poseReference, setPoseReference] = usePersistedState<string | null>('pose_reference', null);
   const [selectedPose, setSelectedPose] = usePersistedState<string>('pose_selected', PRESET_POSES[0].id);
+  // Prompt customizado para pose
+  const [customPosePrompt, setCustomPosePrompt] = usePersistedState<string>('pose_custom_prompt', '');
+  // Estado para preview em tela cheia
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedAttire, setSelectedAttire] = usePersistedState<string>('pose_attire', ATTIRE_OPTIONS[0].id);
   const [selectedBg, setSelectedBg] = usePersistedState<string>('pose_bg', BACKGROUND_OPTIONS[0].id);
   const [selectedResolution, setSelectedResolution] = usePersistedState<string>('pose_resolution', '1080x1350');
@@ -281,12 +295,14 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
       const bgObj = BACKGROUND_OPTIONS.find((b) => b.id === selectedBg);
 
       const fullPrompt = [
-        `Professional ${poseObj?.category === 'corpo-inteiro' ? 'full body' : 'medium shot'} commercial photography, ${poseObj?.promptPart || ''}`,
+        selectedPose === 'custom' && customPosePrompt
+          ? `${customPosePrompt.trim()}`
+          : `Professional ${poseObj?.category === 'corpo-inteiro' ? 'full body' : poseObj?.category === 'rosto' ? 'close-up portrait' : 'medium shot'} commercial photography, ${poseObj?.promptPart || ''}`,
         `Attire: ${attireObj?.prompt || ''}`,
         `Environment: ${bgObj?.prompt || ''}`,
         customDetails ? `Additional details: ${customDetails}.` : '',
         `Maintain exact facial features, bone structure, skin texture, ethnicity, and likeness of the person in the reference image. Ultra-detailed, 8k, hyper-realistic, professional color grading, editorial quality`,
-        `Composition: leave clean space on the right or left for text overlay to be added later`,
+        `Composition: subject CENTERED in the frame, balanced framing with subject occupying the middle 60% of the image, leave clean space only at the edges for text overlay`,
       ]
         .filter(Boolean)
         .join('. ');
@@ -536,6 +552,35 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* PROMPT PERSONALIZADO */}
+            <div className="pt-2 border-t border-white/10 mt-2">
+              <button
+                onClick={() => setSelectedPose('custom')}
+                className={`w-full text-left p-2.5 rounded-xl border transition-all ${
+                  selectedPose === 'custom'
+                    ? 'bg-gradient-to-r from-fuchsia-500/20 to-purple-500/20 border-fuchsia-500 text-white shadow-lg'
+                    : 'bg-white/[0.02] border-white/5 text-gray-300 hover:bg-white/[0.05]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {selectedPose === 'custom' && <CheckCircle2 size={14} className="text-fuchsia-400 shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold leading-tight">✨ Prompt Personalizado</p>
+                    <p className="text-[10px] text-gray-400">Escreva sua própria descrição de pose</p>
+                  </div>
+                </div>
+              </button>
+              {selectedPose === 'custom' && (
+                <textarea
+                  rows={3}
+                  value={customPosePrompt}
+                  onChange={(e) => setCustomPosePrompt(e.target.value)}
+                  placeholder="Ex: full body shot in dynamic action pose, jumping over an obstacle, sporty outfit, dynamic motion, athletic background..."
+                  className="w-full mt-2 px-3 py-2 rounded-xl bg-white/5 border border-fuchsia-500/30 text-white text-xs placeholder-gray-500 focus:border-fuchsia-500 focus:outline-none resize-none"
+                />
+              )}
+            </div>
           </div>
 
           {/* ROUPA + CENARIO (em 2 colunas) */}
@@ -634,8 +679,16 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
                 <img
                   src={img}
                   alt={`Pose ${idx + 1}`}
-                  className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
+                  className="w-full aspect-square object-cover object-center group-hover:scale-105 transition-transform"
                 />
+                {/* Botão de preview/zoom fixo no canto */}
+                <button
+                  onClick={() => setPreviewImage(img)}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-brand-500 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+                  title="Ver em tela cheia"
+                >
+                  <Search size={13} />
+                </button>
                 <div className="absolute inset-x-0 bottom-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/80 to-transparent">
                   <button
                     onClick={() => onSendToCreative(img)}
@@ -654,6 +707,28 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* MODAL DE PREVIEW EM TELA CHEIA */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
+            title="Fechar"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
