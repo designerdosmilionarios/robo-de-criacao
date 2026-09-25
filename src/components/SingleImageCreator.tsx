@@ -119,7 +119,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   );
 
   // SELECAO E DRAG DIRETO NO CANVAS (mais controle sem ir no painel direito)
-  const [selectedCanvasEl, setSelectedCanvasEl] = useState<'logo' | 'text' | 'person' | null>(null);
+  const [selectedCanvasEl, setSelectedCanvasEl] = usePersistedState<'logo' | 'text' | 'person' | null>('single_selected_el', null);
   const [logoXY, setLogoXY] = usePersistedState<{ x: number; y: number } | null>('single_logo_xy', null);
   const [personXY, setPersonXY] = usePersistedState<{ x: number; y: number } | null>('single_person_xy', null);
   const [textBlockXY, setTextBlockXY] = useState<{ x: number; y: number }>({ x: 50, y: 80 });
@@ -132,7 +132,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [ctaPos, setCtaPos] = usePersistedState<{ x: number; y: number } | null>('single_cta_pos', null);
 
   // MODO VARIAÇÕES EM MASSA
-  const [variationsCount, setVariationsCount] = useState<number>(4);
+  const [variationsCount, setVariationsCount] = usePersistedState<number>('single_variations_count', 4);
   const [bulkVariations, setBulkVariations] = useState<string[]>([]);
   const [isBulkGenerating, setIsBulkGenerating] = useState(false);
 
@@ -147,7 +147,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [masterPromptLog, setMasterPromptLog] = useState<string[]>([]);
 
   // Imagem de Referência para a IA guiar o estilo
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceImage, setReferenceImage] = usePersistedState<string | null>('single_ref_image', null);
 
   // Logo da Marca (PERSISTIDO)
   const [logoImage, setLogoImage] = usePersistedState<string | null>('single_logo_image', brand.logoUrl || null);
@@ -169,7 +169,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [personBottomFade, setPersonBottomFade] = useState(true);
 
   // Selo de Autoridade / Badge
-  const [selectedBadge, setSelectedBadge] = useState<string | null>('none');
+  const [selectedBadge, setSelectedBadge] = usePersistedState<string | null>('single_selected_badge', 'none');
 
   // Controles de visibilidade do topo (cada cliente decide)
   const [showTopBar, setShowTopBar] = usePersistedState<boolean>('single_show_topbar', true);
@@ -239,7 +239,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   });
 
   // MODO DE EDICAO: 'auto' = layout pre-definido | 'free' = posicionamento livre
-  const [editMode, setEditMode] = useState<'auto' | 'free'>('auto');
+  const [editMode, setEditMode] = usePersistedState<'auto' | 'free'>('single_edit_mode', 'auto');
   const [freeLayers, setFreeLayers] = useState<CanvasLayer[]>([]);
 
   // Galeria de imagens geradas
