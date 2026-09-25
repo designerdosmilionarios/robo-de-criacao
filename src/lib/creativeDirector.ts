@@ -31,6 +31,288 @@ export interface CopySnippet {
   category: string;
 }
 
+// =============================
+// DIREÇÃO ARTÍSTICA
+// 4 níveis progressivos: Minimalista → Editorial → Dramático → Cinematográfico
+// Cada nível injeta composição + lighting + mood no prompt final.
+// =============================
+
+export type ArtDirectionLevel = 'minimalista' | 'editorial' | 'dramatico' | 'cinematografico';
+
+export interface ArtDirection {
+  id: ArtDirectionLevel;
+  label: string;
+  emoji: string;
+  shortLabel: string;
+  description: string;
+  // Bloco de composição: como os elementos se organizam no quadro
+  composition: string;
+  // Bloco de iluminação: como a cena é iluminada
+  lighting: string;
+  // Mood: emoção / atmosfera predominante
+  mood: string;
+  // Paleta base sugerida
+  basePalette: string;
+  // Estilo de tipografia dominante no nível
+  typographyMood: string;
+}
+
+export const ART_DIRECTIONS: ArtDirection[] = [
+  {
+    id: 'minimalista',
+    label: 'Minimalista',
+    emoji: '◻️',
+    shortLabel: 'Limpo',
+    description: 'Tipografia grande, fundo liso, foco total no texto. Rápido de produzir, alto contraste.',
+    composition:
+      'minimalist composition, generous negative space, single focal point, large typographic area, 1-2 visual elements only',
+    lighting: 'soft flat daylight, no dramatic shadows, even illumination',
+    mood: 'clean, direct, confident, calm',
+    basePalette: '#FFFFFF / #111111',
+    typographyMood: 'oversized bold sans-serif or condensed black, high contrast',
+  },
+  {
+    id: 'editorial',
+    label: 'Editorial',
+    emoji: '▤',
+    shortLabel: 'Editorial',
+    description: 'Composição de revista: hierarquia clara com tag, headline, subtexto, CTA. Listas, grades ou mockups.',
+    composition:
+      'editorial magazine layout, clear vertical hierarchy (badge → headline → subhead → CTA), structured grid, organized negative space',
+    lighting: 'studio softbox lighting, balanced, professional product-photography feel',
+    mood: 'authoritative, polished, informative, trustworthy',
+    basePalette: '#F5F5F0 / #2C2C2C',
+    typographyMood: 'mixed weights, serif headline optional, refined sans for body',
+  },
+  {
+    id: 'dramatico',
+    label: 'Dramático',
+    emoji: '◐',
+    shortLabel: 'Dramático',
+    description: 'Pessoa humana em cena cinematográfica, iluminação moody, texto impactante. Emoção em primeiro plano.',
+    composition:
+      'cinematic portrait composition, subject in foreground occupying 40-60% of frame, dramatic depth of field, atmospheric haze',
+    lighting:
+      'moody cinematic lighting, chiaroscuro with rim light, warm key light on face, deep shadows',
+    mood: 'intense, emotional, hopeful yet serious, transformative',
+    basePalette: '#0A0B10 / #FFD700',
+    typographyMood: 'bold condensed display, slight outline or glow, all-caps for impact',
+  },
+  {
+    id: 'cinematografico',
+    label: 'Cinematográfico',
+    emoji: '🎬',
+    shortLabel: 'Cinema',
+    description: 'Hero shot cinematográfico, cenário urbano/personagem com nome da cidade, magazine-style.',
+    composition:
+      'hero shot cinematic composition, subject as protagonist in epic environment, ultra wide framing, foreground / midground / background layers',
+    lighting:
+      'anamorphic cinematic lighting, volumetric god rays or neon city glow, film grain, 2.39:1 feel adapted to 9:16',
+    mood: 'epic, aspirational, iconic, larger-than-life',
+    basePalette: '#000000 / #FF4500',
+    typographyMood: 'oversized serif or condensed display with cinematic glow, magazine cover feel',
+  },
+];
+
+// =============================
+// CATEGORIAS VISUAIS (além das categorias de nicho)
+// Focadas no FORMATO do criativo, não no mercado.
+// =============================
+
+export interface VisualCategory {
+  id: string;
+  label: string;
+  emoji: string;
+  description: string;
+  // Trecho que será injetado no prompt quando esta categoria for escolhida
+  promptFragment: string;
+  // Copy snippets típicos desta categoria (podem virar highlight / headline)
+  copyTemplates: string[];
+  // Em qual nível funciona melhor (1-4)
+  bestWithLevels: ArtDirectionLevel[];
+}
+
+export const VISUAL_CATEGORIES: VisualCategory[] = [
+  {
+    id: 'citacao',
+    label: 'Citação / Frase',
+    emoji: '💬',
+    description: 'Headline autoral em destaque total. Fundo neutro ou sutil textura.',
+    promptFragment:
+      'a single powerful quote as the hero of the composition, oversized typography centered or rule-of-thirds aligned, ultra-clean background',
+    copyTemplates: [
+      'A virada começa quando você decide parar de [ação]',
+      'Você não precisa de mais tempo. Precisa de mais [qualidade].',
+      'O custo de não decidir é maior que o risco de decidir errado.',
+    ],
+    bestWithLevels: ['minimalista', 'editorial', 'dramatico'],
+  },
+  {
+    id: 'quiz',
+    label: 'Quiz / Você está?',
+    emoji: '🎯',
+    description: 'Card de pergunta interativa, 2 estados opostos, visual direto.',
+    promptFragment:
+      'interactive question card layout, two opposite state options separated by a divider, voting / poll aesthetic, clear contrast between the two states',
+    copyTemplates: [
+      'Você ainda está esperando… ou já está agindo?',
+      'Esperando o momento certo ou construindo o seu?',
+      'Reclamando do jogo ou entrando em campo?',
+    ],
+    bestWithLevels: ['minimalista', 'editorial'],
+  },
+  {
+    id: 'depoimento',
+    label: 'Depoimento',
+    emoji: '🗣️',
+    description: 'Prova social, foto da pessoa real + frase marcante + credibilidade.',
+    promptFragment:
+      'authentic testimonial composition, portrait of a real-looking person with subtle smile or sincere expression, speech-bubble or quote-card framing, soft lifestyle background',
+    copyTemplates: [
+      '"Eu achava que era [crença antiga]. Até descobrir [método]." — [Nome]',
+      '"Mudei minha [área] em [tempo] usando [método]." — [Nome]',
+      '"Hoje eu [resultado]. Foi possível com [método]." — [Nome]',
+    ],
+    bestWithLevels: ['editorial', 'dramatico'],
+  },
+  {
+    id: 'agenda',
+    label: 'Agenda / Programação',
+    emoji: '📅',
+    description: 'Lista vertical ou grade com horários, nomes e miniaturas. Ideal para eventos.',
+    promptFragment:
+      'event agenda card layout, vertical timeline or grid of sessions, each row with time + speaker thumbnail + topic, clean dividers, consistent rhythm',
+    copyTemplates: [
+      '19h00 — Abertura com [palestrante]',
+      '20h00 — Palestra: [título]',
+      '21h30 — Painel com [convidados]',
+    ],
+    bestWithLevels: ['editorial', 'cinematografico'],
+  },
+  {
+    id: 'personagem',
+    label: 'Personagem dramático',
+    emoji: '🎭',
+    description: 'Pessoa em cena épica, olhar forte, texto em peso máximo.',
+    promptFragment:
+      'cinematic character poster, single person as protagonist with intense gaze or contemplative pose, atmospheric environment behind, magazine cover framing',
+    copyTemplates: [
+      'DE VOLTA AO PROPÓSITO',
+      'QUEM VOCÊ É QUANDO NINGUÉM ESTÁ OLHANDO?',
+      'O PROTAGONISTA DA SUA PRÓPRIA HISTÓRIA',
+    ],
+    bestWithLevels: ['dramatico', 'cinematografico'],
+  },
+  {
+    id: 'cidade',
+    label: 'Cidade em destaque',
+    emoji: '🌆',
+    description: 'Hero shot com cenário urbano icônico, nome da cidade grande.',
+    promptFragment:
+      'urban hero shot composition, iconic city skyline or landmark in background with depth, subject foregrounded or in silhouette, golden hour or night neon lighting',
+    copyTemplates: [
+      'EM [CIDADE] — O ENCONTRO QUE VAI MUDAR TUDO',
+      'CHEGAMOS EM [CIDADE]. PREPARA-SE.',
+      '[CIDADE] RECEBE O MAIOR EVENTO DE [ÁREA]',
+    ],
+    bestWithLevels: ['cinematografico'],
+  },
+  {
+    id: 'lancamento',
+    label: 'Lançamento / Hero',
+    emoji: '🚀',
+    description: 'Produto/curso/método em destaque épico, sensação premium e aspiracional.',
+    promptFragment:
+      'premium hero shot of a product / course / methodology, single subject elevated on dark or gradient stage, dramatic top lighting, ultra-clean composition',
+    copyTemplates: [
+      'TRILHA DO [PROTAGONISTA]',
+      'O MÉTODO [NOME] ESTÁ NO AR',
+      '[PRODUTO]: A VERSÃO QUE VOCÊ ESPERAVA',
+    ],
+    bestWithLevels: ['dramatico', 'cinematografico'],
+  },
+];
+
+// =============================
+// COMPOSITOR DE PROMPT DIRECIONAL
+// Recebe o briefing do usuário + direção + categoria + estilo + (opcional) foto de pessoa
+// Devolve o prompt final VISÍVEL para o usuário revisar/editar.
+// =============================
+
+export interface DirectedPromptInput {
+  briefing: string;       // O que o usuário quer comunicar (tema, copy, ideia)
+  direction: ArtDirectionLevel;
+  visualCategory: string; // id de VISUAL_CATEGORIES
+  style?: string;         // chave de STYLE_MODIFIERS (opcional)
+  personPhoto?: boolean;  // se true, injeta bloco de personagem
+  brandColors?: string;   // paleta da marca (opcional)
+}
+
+export interface DirectedPromptResult {
+  // Prompt composto, pronto para colar no gerador
+  prompt: string;
+  // Versão decomposta para transparência total
+  blocks: {
+    briefing: string;
+    visualCategory: string;
+    direction: string;
+    lighting: string;
+    mood: string;
+    style: string;
+    personPhoto: string;
+    typographyMood: string;
+  };
+}
+
+export function buildDirectedPrompt(input: DirectedPromptInput): DirectedPromptResult {
+  const direction = ART_DIRECTIONS.find((d) => d.id === input.direction);
+  const visualCat = VISUAL_CATEGORIES.find((c) => c.id === input.visualCategory);
+  const style = input.style && STYLE_MODIFIERS[input.style] ? STYLE_MODIFIERS[input.style] : '';
+
+  const briefing = (input.briefing || '').trim();
+  const dirBlock = direction
+    ? `${direction.composition}, ${direction.lighting}`
+    : '';
+  const moodBlock = direction ? direction.mood : '';
+  const catBlock = visualCat ? visualCat.promptFragment : '';
+  const typographyBlock = direction ? direction.typographyMood : '';
+  const personBlock = input.personPhoto
+    ? 'featuring the same person from the reference photo, preserving facial identity, clothing style and overall mood'
+    : '';
+  const brandBlock = input.brandColors
+    ? `color palette anchored on ${input.brandColors}`
+    : '';
+  const styleBlock = style ? `, ${style}` : '';
+
+  // Monta prompt composto: Briefing → Categoria Visual → Direção → Lighting → Mood → Personagem → Marca → Acabamento
+  const prompt = [
+    briefing && `BRIEFING: ${briefing}`,
+    catBlock,
+    dirBlock,
+    moodBlock && `mood: ${moodBlock}`,
+    typographyBlock && `typography: ${typographyBlock}`,
+    personBlock,
+    brandBlock,
+    styleBlock.replace(/^, /, ''),
+  ]
+    .filter(Boolean)
+    .join('. ');
+
+  return {
+    prompt,
+    blocks: {
+      briefing,
+      visualCategory: catBlock,
+      direction: direction ? direction.composition : '',
+      lighting: direction ? direction.lighting : '',
+      mood: moodBlock,
+      style: style,
+      personPhoto: personBlock,
+      typographyMood: typographyBlock,
+    },
+  };
+}
+
 // Bancos de prompts profissionais organizados por nicho
 export const CREATIVE_CATEGORIES: PromptCategory[] = [
   {
