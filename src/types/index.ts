@@ -76,6 +76,7 @@ export interface CarouselSlide {
   // Estado local persistido por slide (cache de geracao)
   imagePrompt?: string;      // prompt de imagem custom do usuario
   referenceImage?: string | null; // imagem de referencia base64
+  personImage?: string | null; // foto do personagem real (PNG recortado), usada para preservar identidade
 }
 
 export interface CarouselProject {

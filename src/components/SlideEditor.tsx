@@ -83,6 +83,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   const [artDirection, setArtDirection] = useState<ArtDirectionLevel>(slide.artDirection || 'editorial');
   const [visualCategory, setVisualCategory] = useState<string>(slide.visualCategory || 'citacao');
   const [artBriefing, setArtBriefing] = useState<string>(slide.artBriefing || '');
+  const [personImage, setPersonImage] = useState<string | null>(slide.personImage || null);
 
   const [isGeneratingImg, setIsGeneratingImg] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
@@ -105,6 +106,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     setArtDirection(slide.artDirection || 'editorial');
     setVisualCategory(slide.visualCategory || 'citacao');
     setArtBriefing(slide.artBriefing || '');
+    setPersonImage(slide.personImage || null);
     setRefinementHistory([]);
   }, [slide.id]);
 
@@ -125,10 +127,15 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     setArtBriefing(b);
     handleChange('artBriefing', b);
   };
+  const handleUploadPerson = (dataUrl: string | null) => {
+    setPersonImage(dataUrl);
+    handleChange('personImage', dataUrl);
+  };
 
   // Compõe o prompt com base na direção artística (ou cai pro imagePrompt cru)
   const composePromptForGeneration = (): string => {
     const hasDirection = !!(artDirection || visualCategory || artBriefing);
+    const supportsPerson = artDirection === 'dramatico' || artDirection === 'cinematografico';
     if (!hasDirection) {
       return (
         imagePrompt ||
@@ -140,6 +147,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       direction: artDirection,
       visualCategory,
       style: 'premium',
+      personPhoto: supportsPerson && !!personImage,
     });
     return composed.prompt;
   };
@@ -168,6 +176,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     }
     const promptToUse = composePromptForGeneration();
 
+    // Prioridade: foto do personagem > imagem de referência
+    const identityImage = personImage || referenceImage;
+
     setIsGeneratingImg(true);
     setImgError(null);
 
@@ -182,7 +193,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           aspectRatio: aspectRatio === '4:5' ? '4:5' : aspectRatio === '9:16' ? '9:16' : '1:1',
           provider: 'openai',
           preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
-          ...(referenceImage ? { imageBase64: referenceImage.replace(/^data:image\/\w+;base64,/, '') } : {}),
+          ...(identityImage ? { imageBase64: identityImage.replace(/^data:image\/\w+;base64,/, '') } : {}),
         }),
       });
       const data = await res.json();
@@ -248,6 +259,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     }
     const promptToUse = composePromptForGeneration();
 
+    // Prioridade: foto do personagem > imagem de referência
+    const identityImage = personImage || referenceImage;
+
     setIsBulkGenerating(true);
     setBulkVariations([]);
     setBulkProgress({ current: 0, total: variationsCount });
@@ -271,6 +285,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             aspectRatio,
             provider: 'openai',
             preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
+            ...(identityImage ? { imageBase64: identityImage.replace(/^data:image\/\w+;base64,/, '') } : {}),
           }),
         });
         const data = await res.json();
@@ -529,6 +544,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             briefing={artBriefing}
             style="premium"
             title={slide.title}
+            personImage={personImage}
             onChangeDirection={handleChangeDirection}
             onChangeVisualCategory={handleChangeVisualCategory}
             onChangeBriefing={handleChangeBriefing}
@@ -536,6 +552,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               setImagePrompt(composed);
               handleChange('imagePrompt', composed);
             }}
+            onUploadPerson={handleUploadPerson}
           />
 
           {/* Prompt + botão de gerar */}

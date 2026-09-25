@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Layers,
   ChevronDown,
@@ -7,6 +7,8 @@ import {
   Wand2,
   Check,
   X,
+  User,
+  Upload,
 } from 'lucide-react';
 import {
   ART_DIRECTIONS,
@@ -22,10 +24,12 @@ interface SlideArtDirectionProps {
   style: string; // STYLE_MODIFIERS key
   brandColors?: { primaryColor: string; secondaryColor: string; backgroundColor: string };
   title: string; // usado como fallback do briefing
+  personImage: string | null;
   onChangeDirection: (d: ArtDirectionLevel) => void;
   onChangeVisualCategory: (id: string) => void;
   onChangeBriefing: (b: string) => void;
   onApplyToPrompt: (composed: string) => void;
+  onUploadPerson: (dataUrl: string | null) => void;
 }
 
 export const SlideArtDirection: React.FC<SlideArtDirectionProps> = ({
@@ -35,15 +39,21 @@ export const SlideArtDirection: React.FC<SlideArtDirectionProps> = ({
   style,
   brandColors,
   title,
+  personImage,
   onChangeDirection,
   onChangeVisualCategory,
   onChangeBriefing,
   onApplyToPrompt,
+  onUploadPerson,
 }) => {
   const [showPreview, setShowPreview] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedDirection = ART_DIRECTIONS.find((d) => d.id === direction);
   const selectedCategory = VISUAL_CATEGORIES.find((c) => c.id === visualCategory);
+
+  // Foto de personagem só faz sentido em níveis Dramático ou Cinematográfico
+  const supportsPerson = direction === 'dramatico' || direction === 'cinematografico';
 
   const composedPrompt = useMemo(
     () =>
@@ -55,12 +65,22 @@ export const SlideArtDirection: React.FC<SlideArtDirectionProps> = ({
         brandColors: brandColors
           ? `${brandColors.primaryColor}, ${brandColors.secondaryColor}, ${brandColors.backgroundColor}`
           : undefined,
+        personPhoto: supportsPerson && !!personImage,
       }),
-    [briefing, direction, visualCategory, style, title, brandColors]
+    [briefing, direction, visualCategory, style, title, brandColors, personImage, supportsPerson]
   );
 
   const handleApplyCopy = (text: string) => {
     onApplyToPrompt(text);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onUploadPerson(reader.result as string);
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -157,6 +177,60 @@ export const SlideArtDirection: React.FC<SlideArtDirectionProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Upload de foto do personagem (apenas em níveis Dramático/Cinematográfico) */}
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                <User size={10} /> Foto do Personagem
+              </label>
+              {!supportsPerson && (
+                <span className="text-[8px] text-amber-400/80 italic">
+                  Só injeta no prompt em níveis Dramático/Cinema
+                </span>
+              )}
+            </div>
+            {!personImage ? (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!supportsPerson}
+                className={`w-full text-[10px] py-2 px-2 rounded-lg border border-dashed transition-all flex items-center justify-center gap-1.5 ${
+                  supportsPerson
+                    ? 'text-gray-300 hover:text-brand-400 border-white/10 hover:border-brand-500/50'
+                    : 'text-gray-600 border-white/5 cursor-not-allowed'
+                }`}
+                title={supportsPerson ? 'Anexar foto recortada (PNG)' : 'Mude para Dramático ou Cinema para usar'}
+              >
+                <Upload size={11} />
+                {supportsPerson ? '+ Anexar foto do personagem' : 'Indisponível neste nível'}
+              </button>
+            ) : (
+              <div className="relative rounded-lg overflow-hidden border border-brand-500/30">
+                <img
+                  src={personImage}
+                  alt="personagem"
+                  className="w-full h-20 object-contain bg-black/40"
+                />
+                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-brand-500/80 text-white text-[8px] font-bold uppercase">
+                  Foto ativa
+                </div>
+                <button
+                  onClick={() => onUploadPerson(null)}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center"
+                  title="Remover foto"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Copy templates */}
