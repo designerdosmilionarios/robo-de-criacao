@@ -44,6 +44,7 @@ import { FreeCanvasEditor, CanvasLayer } from '@/components/FreeCanvasEditor';
 import { SmartTemplates, SmartTemplate, AVAILABLE_TEMPLATES } from '@/components/SmartTemplates';
 import { usePersistedState } from '@/lib/usePersistedState';
 import { BackgroundImageControl, buildBackgroundImageStyle } from '@/components/BackgroundImageControl';
+import { TextGradientOverlay, buildOverlayStyle, DEFAULT_OVERLAY, GradientOverlayConfig } from '@/components/TextGradientOverlay';
 
 const SUPPORTED_IMAGE_MODELS = ['auto', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2'];
 
@@ -104,6 +105,12 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Glows de marca (esferas coloridas desfocadas no fundo)
   const [showBrandGlows, setShowBrandGlows] = useState(true);
   const [glowIntensity, setGlowIntensity] = useState(35);
+
+  // Overlay de degradê para contraste de leitura
+  const [textOverlay, setTextOverlay] = usePersistedState<GradientOverlayConfig>(
+    'single_text_overlay',
+    DEFAULT_OVERLAY
+  );
 
   // SELECAO E DRAG DIRETO NO CANVAS (mais controle sem ir no painel direito)
   const [selectedCanvasEl, setSelectedCanvasEl] = useState<'logo' | 'text' | 'person' | null>(null);
@@ -916,6 +923,22 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
 
+              {/* CAMADA 5.5: OVERLAY DE DEGRADÊ PARA CONTRASTE DE LEITURA */}
+              {textOverlay.enabled && (
+                <div
+                  className="absolute z-15 pointer-events-none"
+                  style={{
+                    ...(textOverlay.startPosition === 'top'
+                      ? { top: 0 }
+                      : textOverlay.startPosition === 'bottom'
+                      ? { bottom: 0 }
+                      : { top: `${(100 - textOverlay.heightPercent) / 2}%` }),
+                    left: 0,
+                    ...buildOverlayStyle(textOverlay),
+                  }}
+                />
+              )}
+
               {/* CAMADA 6: TEXTOS E ELEMENTOS DO ANÚNCIO */}
               {showText && (
                 <div
@@ -1582,6 +1605,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* SEÇÃO 3.5: DEGRADÊ DE CONTRASTE PARA TEXTOS */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Sparkles size={16} className="text-blue-400" /> Degradê de Contraste
+              </h3>
+            </div>
+            <TextGradientOverlay config={textOverlay} onChange={setTextOverlay} />
           </div>
 
           {/* SEÇÃO 0: DIRETOR CRIATIVO IA - INTELIGENCIA CRIATIVA */}
