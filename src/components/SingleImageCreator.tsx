@@ -999,7 +999,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       personPosition === 'right' && textAlignment === 'left' ? 'max-w-[62%]' : 'max-w-full'
                     }`}
                     style={{
-                      position: headlinePos ? 'absolute' : 'static',
+                      position: (headlinePos || highlightPos || sublinePos || ctaPos) ? 'absolute' : 'static',
                       left: headlinePos ? `${headlinePos.x}%` : undefined,
                       top: headlinePos ? `${headlinePos.y}%` : undefined,
                       transform: headlinePos ? 'translate(-50%, -50%)' : undefined,
