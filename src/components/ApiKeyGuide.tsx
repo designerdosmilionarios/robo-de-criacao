@@ -102,7 +102,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto py-2">
+    <div className="space-y-8 max-w-[1500px] 2xl:max-w-[1700px] mx-auto py-2">
       {/* Header do Guia */}
       <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0e1220] via-[#0b0e17] to-[#07090e] border border-white/10 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -265,7 +265,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
         </h2>
 
         {/* PASSO 1 */}
-        <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 items-start">
+        <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 2xl:gap-8 items-start">
           <div className="w-10 h-10 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20 flex items-center justify-center font-black text-lg shrink-0">
             1
           </div>
@@ -288,7 +288,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
         </div>
 
         {/* PASSO 2 */}
-        <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 items-start">
+        <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 2xl:gap-8 items-start">
           <div className="w-10 h-10 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20 flex items-center justify-center font-black text-lg shrink-0">
             2
           </div>
@@ -314,7 +314,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
         </div>
 
         {/* PASSO 3 */}
-        <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 items-start">
+        <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 2xl:gap-8 items-start">
           <div className="w-10 h-10 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20 flex items-center justify-center font-black text-lg shrink-0">
             3
           </div>
@@ -342,7 +342,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
         </div>
 
         {/* PASSO 4 */}
-        <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 items-start">
+        <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row gap-6 2xl:gap-8 items-start">
           <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-black text-lg shrink-0">
             4
           </div>

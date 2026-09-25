@@ -510,8 +510,8 @@ export default function Home() {
   return (
     <main className="min-h-screen pb-16">
       {/* NAVBAR SUPERIOR */}
-      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#07090e]/80 backdrop-blur-xl px-4 sm:px-8 py-3.5">
-        <div className="max-w-[1600px] mx-auto grid grid-cols-[minmax(0,1fr)_auto] 2xl:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 2xl:gap-4">
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#07090e]/80 backdrop-blur-xl px-4 sm:px-8 2xl:px-12 py-3.5">
+        <div className="max-w-[1900px] 3xl:max-w-[2100px] mx-auto grid grid-cols-[minmax(0,1fr)_auto] 2xl:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 2xl:gap-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center text-dark-900 font-extrabold shadow-lg shadow-brand-500/20">
               <Sparkles size={20} />
@@ -649,10 +649,10 @@ export default function Home() {
       </header>
 
       {/* CONTEÚDO PRINCIPAL */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 mt-8">
+      <div className="max-w-[1600px] 2xl:max-w-[1900px] 3xl:max-w-[2100px] mx-auto px-4 sm:px-8 2xl:px-12 mt-8">
         {activeTab === 'carousel' && (
           <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 shadow-lg">
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -697,9 +697,9 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-12 2xl:gap-7 items-start">
               <div className="xl:col-span-8 flex flex-col items-center">
-                <div className="w-full max-w-[580px] mx-auto">
+                <div className="w-full max-w-[580px] 2xl:max-w-[760px] mx-auto">
                   <SlideCanvas
                     id={`carousel-slide-${activeSlide.id}`}
                     slide={activeSlide}
@@ -764,7 +764,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:pr-2">
+              <div className="xl:col-span-4 2xl:max-w-[480px] space-y-4 2xl:space-y-5 xl:sticky xl:top-28 xl:max-h-[calc(100vh-128px)] xl:overflow-y-auto xl:pr-2">
                 <SlideEditor
                   slide={activeSlide}
                   index={activeSlideIndex}
@@ -834,7 +834,7 @@ export default function Home() {
 
         {activeTab === 'flow' && (
           <div className="space-y-4">
-            <div className="p-5 rounded-3xl bg-gradient-to-br from-brand-500/10 via-purple-500/5 to-transparent border border-brand-500/20">
+            <div className="p-5 2xl:p-7 rounded-3xl bg-gradient-to-br from-brand-500/10 via-purple-500/5 to-transparent border border-brand-500/20">
               <h2 className="text-xl font-extrabold text-white mb-2 flex items-center gap-2">
                 <GitBranch size={20} className="text-brand-400" />
                 Esteira IA — Estúdio de Produção com IA

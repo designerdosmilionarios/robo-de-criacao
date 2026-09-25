@@ -341,7 +341,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
+      <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
@@ -377,11 +377,11 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
       </div>
 
       {/* GRID 2 COLUNAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:gap-7 gap-6">
         {/* COLUNA ESQUERDA: FOTOS DE REFERENCIA */}
         <div className="space-y-4">
           {/* FOTOS DO ROSTO (ate 3) */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Camera size={14} className="text-emerald-400" /> Fotos do Rosto
@@ -447,7 +447,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
           </div>
 
           {/* REFERENCIA DA POSE (opcional) */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <ImageIcon size={14} className="text-blue-400" /> Referência da Pose
@@ -496,7 +496,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
         {/* COLUNA DIREITA: CONFIGURACOES */}
         <div className="space-y-4">
           {/* ESCOLHA DA POSE - POR CATEGORIA */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
             <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
               <Sparkles size={14} className="text-purple-400" /> Escolha a Pose
               <span className="text-[10px] text-gray-500">({PRESET_POSES.length} disponiveis)</span>
@@ -668,7 +668,7 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
 
       {/* GALERIA DE POSES GERADAS */}
       {generatedPoses.length > 0 && (
-        <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
+        <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
           <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
             <Sparkles size={16} className="text-brand-400" /> Poses Geradas
             <span className="text-[10px] text-gray-500">({generatedPoses.length})</span>

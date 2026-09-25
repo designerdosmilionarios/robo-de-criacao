@@ -891,13 +891,13 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   return (
     <div className="space-y-8">
       {/* BARRA SUPERIOR DE FORMATOS E TÍTULO */}
-      <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-6 2xl:p-7 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl 2xl:text-2xl font-bold text-white flex items-center gap-2">
             <ImageIcon size={22} className="text-brand-400" />
             Criador de Anúncio Único & Thumbnails
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs 2xl:text-sm text-gray-400 mt-1">
             Crie anúncios de alta conversão combinando pessoas reais, referências, logos, selos e tipografia da marca.
           </p>
         </div>
@@ -942,10 +942,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       </div>
 
       {/* ÁREA PRINCIPAL: CANVAS (COLUNA ESQUERDA) + CONTROLES (COLUNA DIREITA) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 2xl:gap-7 items-start">
         {/* COLUNA ESQUERDA: CANVAS PREVIEW (8 COLS - maior para melhor visualizacao) */}
         <div className="xl:col-span-8 flex flex-col items-center">
-          <div className="w-full max-w-[680px]">
+          <div className="w-full max-w-[680px] 2xl:max-w-[820px]">
             {editMode === 'free' ? (
               // MODO TEMPLATES: Sistema de templates automaticos com IA
               <SmartTemplates
@@ -1441,11 +1441,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         </div>
 
         {/* COLUNA DIREITA: PAINEL DE EDIÇÃO (4 COLS) */}
-        <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-28 xl:max-h-[calc(100vh-128px)] xl:overflow-y-auto xl:pr-2">
+        <div className="xl:col-span-4 2xl:max-w-[460px] space-y-4 2xl:space-y-5 xl:sticky xl:top-28 xl:max-h-[calc(100vh-128px)] xl:overflow-y-auto xl:pr-2">
           {/* SEÇÃO INDEPENDENTE: POSIÇÃO INDIVIDUAL DOS TEXTOS (X/Y) */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm 2xl:text-base font-bold text-white flex items-center gap-2">
                 <MousePointer size={16} className="text-emerald-400" /> Posição Individual dos Textos
               </h3>
               <span className="text-[10px] text-gray-500 font-mono">X / Y (%)</span>
@@ -1529,7 +1529,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 1: LOGO DO CLIENTE */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <ImgIcon size={16} className="text-amber-400" /> Logo do Cliente / Marca
@@ -1668,7 +1668,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 2: IMAGEM DE REFERÊNCIA VISUAL PARA A IA */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Sparkles size={16} className="text-blue-400" /> Imagem de Referência (Estilo/Inspiração)
@@ -1724,7 +1724,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 3: DEGRADÊ DO FUNDO */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Palette size={16} className="text-emerald-400" /> Degradê / Fundo Sólido
@@ -1862,7 +1862,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 3.5: DEGRADÊ DE CONTRASTE PARA TEXTOS */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Sparkles size={16} className="text-blue-400" /> Degradê de Contraste
@@ -1894,7 +1894,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           />
 
           {/* SEÇÃO 4: PESSOA REAL */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <User size={16} className="text-brand-400" /> Pessoa Real no Criativo
@@ -2017,7 +2017,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 4: BACKGROUND (IA OU UPLOAD) */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Sparkles size={16} className="text-purple-400" /> Cenário de Fundo (IA)
@@ -2250,7 +2250,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 5: BARRA SUPERIOR 100% EDITÁVEL POR ELEMENTO */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Award size={16} className="text-brand-400" /> Barra Superior (Topo do Criativo)
@@ -2349,7 +2349,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
 
           {/* SEÇÃO 6: TEXTOS & TIPOGRAFIA AVANCADA */}
-          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+          <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Type size={16} className="text-brand-400" /> Textos & Tipografia

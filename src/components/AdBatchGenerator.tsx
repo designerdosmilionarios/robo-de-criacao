@@ -141,7 +141,7 @@ export const AdBatchGenerator: React.FC<AdBatchGeneratorProps> = ({ brand, onSav
   return (
     <div className="space-y-8">
       {/* PAINEL DE CONTROLE DE BATCH */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
+      <div className="p-6 sm:p-8 2xl:p-10 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20">

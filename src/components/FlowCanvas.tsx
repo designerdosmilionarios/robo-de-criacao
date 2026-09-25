@@ -474,7 +474,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       </div>
 
       {/* AREA DO CANVAS (meio) */}
-      <div className="h-[700px] w-full overflow-auto bg-[#07090e]">
+      <div className="h-[700px] 2xl:h-[820px] w-full overflow-auto bg-[#07090e]">
         <div
           ref={canvasRef}
           className="relative bg-[#07090e]"

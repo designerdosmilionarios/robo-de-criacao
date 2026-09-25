@@ -109,7 +109,7 @@ export const MyProjects: React.FC<MyProjectsProps> = ({
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
+      <div className="p-6 sm:p-8 2xl:p-10 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
@@ -244,7 +244,7 @@ export const MyProjects: React.FC<MyProjectsProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 2xl:gap-5">
           {filtered.map((project) => {
             const meta = TYPE_META[project.type];
             const Icon = meta.icon;

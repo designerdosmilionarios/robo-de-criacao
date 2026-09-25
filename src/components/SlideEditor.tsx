@@ -321,7 +321,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   };
 
   return (
-    <div className="space-y-6 bg-[#0e111a] border border-white/10 p-6 rounded-3xl shadow-xl">
+    <div className="space-y-6 bg-[#0e111a] border border-white/10 p-6 2xl:p-7 rounded-3xl shadow-xl">
       {/* ============ SELETORES GLOBAIS ============ */}
       <div className="pb-5 border-b border-white/10 space-y-4">
         <div className="flex items-center justify-between">
