@@ -19,6 +19,8 @@ import {
 import { usePersistedState } from '@/lib/usePersistedState';
 import { PosControl } from '@/components/PosControl';
 import { ToggleRow } from '@/components/ToggleRow';
+import { SlideArtDirection } from '@/components/SlideArtDirection';
+import { buildDirectedPrompt, ArtDirectionLevel } from '@/lib/creativeDirector';
 
 interface SlideEditorProps {
   slide: CarouselSlide;
@@ -71,12 +73,17 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   onOpenSettings,
   provider,
 }) => {
-  // Estados persistidos
-  const [imagePrompt, setImagePrompt] = usePersistedState<string>('slide_image_prompt', '');
-  const [referenceImage, setReferenceImage] = usePersistedState<string | null>('slide_ref_image', null);
+  // Estados locais (sincronizados com o slide.id para suportar navegação entre slides)
+  const [imagePrompt, setImagePrompt] = useState<string>(slide.imagePrompt || '');
+  const [referenceImage, setReferenceImage] = useState<string | null>(slide.referenceImage || null);
   const [selectedModel, setSelectedModel] = usePersistedState<string>('slide_model', 'auto');
   const [refineInstruction, setRefineInstruction] = usePersistedState<string>('slide_refine_instruction', '');
   const [variationsCount, setVariationsCount] = usePersistedState<number>('slide_variations_count', 4);
+  // Direção artística do slide (vinda do projeto salvo)
+  const [artDirection, setArtDirection] = useState<ArtDirectionLevel>(slide.artDirection || 'editorial');
+  const [visualCategory, setVisualCategory] = useState<string>(slide.visualCategory || 'citacao');
+  const [artBriefing, setArtBriefing] = useState<string>(slide.artBriefing || '');
+
   const [isGeneratingImg, setIsGeneratingImg] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [isBulkGenerating, setIsBulkGenerating] = useState(false);
@@ -91,13 +98,50 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
   const refInputRef = useRef<HTMLInputElement>(null);
 
-  // Resetar histórico quando o slide muda
+  // Resetar estado local quando o slide muda
   useEffect(() => {
+    setImagePrompt(slide.imagePrompt || '');
+    setReferenceImage(slide.referenceImage || null);
+    setArtDirection(slide.artDirection || 'editorial');
+    setVisualCategory(slide.visualCategory || 'citacao');
+    setArtBriefing(slide.artBriefing || '');
     setRefinementHistory([]);
   }, [slide.id]);
 
   const handleChange = (field: keyof CarouselSlide, val: any) => {
     onUpdateSlide({ ...slide, [field]: val });
+  };
+
+  // Persistir direção artística no slide (vai pro projeto salvo)
+  const handleChangeDirection = (d: ArtDirectionLevel) => {
+    setArtDirection(d);
+    handleChange('artDirection', d);
+  };
+  const handleChangeVisualCategory = (id: string) => {
+    setVisualCategory(id);
+    handleChange('visualCategory', id);
+  };
+  const handleChangeBriefing = (b: string) => {
+    setArtBriefing(b);
+    handleChange('artBriefing', b);
+  };
+
+  // Compõe o prompt com base na direção artística (ou cai pro imagePrompt cru)
+  const composePromptForGeneration = (): string => {
+    const hasDirection = !!(artDirection || visualCategory || artBriefing);
+    if (!hasDirection) {
+      return (
+        imagePrompt ||
+        `Professional ${templateStyle} background illustration, dark aesthetic, theme: ${slide.title}`
+      );
+    }
+    const composed = buildDirectedPrompt({
+      briefing: artBriefing || slide.title || 'Slide do carrossel',
+      direction: artDirection,
+      visualCategory,
+      style: 'premium',
+    });
+    return composed.prompt;
   };
 
   const handleBodyListChange = (itemIndex: number, text: string) => {
@@ -122,9 +166,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       onOpenSettings();
       return;
     }
-    const promptToUse =
-      imagePrompt ||
-      `Professional ${templateStyle} background illustration, dark aesthetic, theme: ${slide.title}`;
+    const promptToUse = composePromptForGeneration();
 
     setIsGeneratingImg(true);
     setImgError(null);
@@ -204,9 +246,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
       onOpenSettings();
       return;
     }
-    const promptToUse =
-      imagePrompt ||
-      `Professional ${templateStyle} background illustration, dark aesthetic, theme: ${slide.title}`;
+    const promptToUse = composePromptForGeneration();
 
     setIsBulkGenerating(true);
     setBulkVariations([]);
@@ -257,7 +297,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setReferenceImage(reader.result as string);
+      const data = reader.result as string;
+      setReferenceImage(data);
+      handleChange('referenceImage', data);
     };
     reader.readAsDataURL(file);
     if (refInputRef.current) refInputRef.current.value = '';
@@ -461,7 +503,10 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 className="w-full h-16 object-cover rounded-md"
               />
               <button
-                onClick={() => setReferenceImage(null)}
+                onClick={() => {
+                  setReferenceImage(null);
+                  handleChange('referenceImage', null);
+                }}
                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center"
                 title="Remover referência"
               >
@@ -477,12 +522,31 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             </button>
           )}
 
+          {/* DIREÇÃO ARTÍSTICA DESTE SLIDE */}
+          <SlideArtDirection
+            direction={artDirection}
+            visualCategory={visualCategory}
+            briefing={artBriefing}
+            style="premium"
+            title={slide.title}
+            onChangeDirection={handleChangeDirection}
+            onChangeVisualCategory={handleChangeVisualCategory}
+            onChangeBriefing={handleChangeBriefing}
+            onApplyToPrompt={(composed) => {
+              setImagePrompt(composed);
+              handleChange('imagePrompt', composed);
+            }}
+          />
+
           {/* Prompt + botão de gerar */}
           <div className="flex gap-2">
             <input
               type="text"
               value={imagePrompt}
-              onChange={(e) => setImagePrompt(e.target.value)}
+              onChange={(e) => {
+                setImagePrompt(e.target.value);
+                handleChange('imagePrompt', e.target.value);
+              }}
               placeholder="Ex: 3D geometric glass rendering, dark theme, professional..."
               className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
             />

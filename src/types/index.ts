@@ -66,6 +66,16 @@ export interface CarouselSlide {
   subtitlePos?: { x: number; y: number };
   ctaPos?: { x: number; y: number };
   bodyListPos?: { x: number; y: number };
+  // =========================================
+  // Direção artística deste slide (opcional)
+  // Quando preenchidos, sobrescrevem o imagePrompt com buildDirectedPrompt()
+  // =========================================
+  artDirection?: 'minimalista' | 'editorial' | 'dramatico' | 'cinematografico';
+  visualCategory?: string;   // id de VISUAL_CATEGORIES (citacao, quiz, personagem, cidade, etc.)
+  artBriefing?: string;      // briefing do slide (tema especifico deste slide)
+  // Estado local persistido por slide (cache de geracao)
+  imagePrompt?: string;      // prompt de imagem custom do usuario
+  referenceImage?: string | null; // imagem de referencia base64
 }
 
 export interface CarouselProject {
