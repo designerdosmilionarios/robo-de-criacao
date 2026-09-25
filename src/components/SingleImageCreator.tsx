@@ -657,7 +657,9 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   };
 
   // Download do Criativo Final em alta resolução
-  const handleDownloadCanvas = async () => {
+  const [exportingPsd, setExportingPsd] = useState(false);
+
+const handleDownloadCanvas = async () => {
     const el = document.getElementById('single-creative-canvas');
     if (!el) return;
     try {
@@ -676,6 +678,58 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       console.error('Erro ao baixar canvas:', e);
     }
   };
+
+  // EXPORTAR PSD COM CAMADAS SEPARADAS PARA PHOTOSHOP
+  const handleExportPsd = async () => {
+    setExportingPsd(true);
+    try {
+      const payload = {
+        width: currentFormat.width,
+        height: currentFormat.height,
+        format: format,
+        backgroundImage: bgImage,
+        backgroundColor: brand.backgroundColor,
+        gradientColor1,
+        gradientColor2,
+        gradientAngle,
+        useGradient,
+        logoImage,
+        logoPosition,
+        logoScale,
+        personImage,
+        personPosition,
+        personScale,
+        personFlipped,
+        tag: { text: tag, ...tagConfig },
+        headline: { text: headline, ...headlineConfig },
+        highlight: { text: highlightText, ...highlightConfig },
+        subline: { text: subline, ...sublineConfig },
+        cta: { text: ctaText, ...ctaConfig },
+        brandName: brand.name,
+      };
+      const res = await fetch('/api/export-psd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Erro ao exportar PSD');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = brand.name.toLowerCase().replace(/s+/g, '-') + '-camadas.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Erro ao exportar PSD: ' + err.message);
+    } finally {
+      setExportingPsd(false);
+    }
+  };
+
 
   return (
     <div className="space-y-8">
@@ -1165,22 +1219,44 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             )}
 
             {/* BOTÕES DE AÇÃO: SALVAR + BAIXAR */}
-            <div className="mt-5 grid grid-cols-2 gap-2.5">
-              {onSaveRequest && (
+            <div className="mt-5 space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                {onSaveRequest && (
+                  <button
+                    onClick={onSaveRequest}
+                    className="inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl font-bold text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
+                  >
+                    <Save size={13} /> Salvar
+                  </button>
+                )}
                 <button
-                  onClick={onSaveRequest}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
+                  onClick={handleDownloadCanvas}
+                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl font-bold text-xs bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-lg"
                 >
-                  <Save size={16} /> Salvar Projeto
+                  <Download size={13} /> PNG
                 </button>
-              )}
+                <button
+                  onClick={() => {/* Toggle hint */}}
+                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl font-bold text-xs bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/30 transition-all"
+                  title="Exportar PSD com camadas separadas para edicao no Photoshop"
+                >
+                  <Layers size={13} /> PSD
+                </button>
+              </div>
               <button
-                onClick={handleDownloadCanvas}
-                className={`inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-lg ${
-                  onSaveRequest ? '' : 'col-span-2'
-                }`}
+                onClick={handleExportPsd}
+                disabled={exportingPsd}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:opacity-95 transition-all shadow-lg disabled:opacity-50"
               >
-                <Download size={16} /> Baixar ({currentFormat.label})
+                {exportingPsd ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Gerando PSD com camadas...
+                  </>
+                ) : (
+                  <>
+                    <Layers size={16} /> Exportar PSD com Camadas (Photoshop)
+                  </>
+                )}
               </button>
             </div>
           </div>
