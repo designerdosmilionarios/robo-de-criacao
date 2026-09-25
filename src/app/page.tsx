@@ -625,9 +625,9 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              <div className="lg:col-span-7 flex flex-col items-center">
-                <div className="w-full max-w-md mx-auto">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+              <div className="xl:col-span-8 flex flex-col items-center">
+                <div className="w-full max-w-[580px] mx-auto">
                   <SlideCanvas
                     id={`carousel-slide-${activeSlide.id}`}
                     slide={activeSlide}
@@ -692,7 +692,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="lg:col-span-5">
+              <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:pr-2">
                 <SlideEditor
                   slide={activeSlide}
                   index={activeSlideIndex}
