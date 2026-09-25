@@ -55,6 +55,17 @@ export interface CarouselSlide {
   ctaButton?: string;
   imageUrl?: string;
   badge?: string;
+  // Campos extras personalizaveis
+  topBadge?: string;          // ex: '🔥 Post Novo', '🚀 NOVO', '💡 DICA'
+  bottomLeft?: string;        // ex: 'DESLIZE PARA VER →', 'Arraste ➔'
+  bottomRight?: string;       // ex: 'Salvar post', 'Marcar ⭐'
+  // Posicoes X/Y dos textos (em % do canvas)
+  tagPos?: { x: number; y: number };
+  titlePos?: { x: number; y: number };
+  highlightPos?: { x: number; y: number };
+  subtitlePos?: { x: number; y: number };
+  ctaPos?: { x: number; y: number };
+  bodyListPos?: { x: number; y: number };
 }
 
 export interface CarouselProject {

@@ -12,6 +12,19 @@ interface SlideCanvasProps {
   id?: string;
 }
 
+// Helper para gerar style de posição absoluta baseada em coordenadas X/Y (%)
+function posStyle(pos?: { x: number; y: number }) {
+  if (!pos) return undefined;
+  return {
+    position: 'absolute' as const,
+    left: `${pos.x}%`,
+    top: `${pos.y}%`,
+    transform: 'translate(-50%, -50%)',
+    width: '90%',
+    maxWidth: '500px',
+  };
+}
+
 export const SlideCanvas: React.FC<SlideCanvasProps> = ({
   slide,
   brand,
@@ -21,7 +34,6 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
   templateStyle,
   id,
 }) => {
-  // Proporções: 4:5 (Instagram Feed 1080x1350), 1:1 (Quadrado), 9:16 (Stories/Reels)
   const aspectClass =
     aspectRatio === '4:5'
       ? 'aspect-[4/5] min-h-[500px]'
@@ -56,7 +68,7 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
         </div>
       )}
 
-      {/* Background Decorativo Dinâmico por Estilo */}
+      {/* Background Decorativo por Estilo */}
       {templateStyle === 'tech-modern' && (
         <>
           <div
@@ -96,7 +108,6 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
 
       {/* HEADER DO SLIDE */}
       <div className="relative z-10 flex items-center justify-between gap-4">
-        {/* Marca / Perfil */}
         <div className="flex items-center gap-2.5">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shadow-md"
@@ -117,7 +128,6 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
           </div>
         </div>
 
-        {/* Indicador de Slide (ex: 01/05) */}
         <div className="flex items-center gap-2">
           {slide.type === 'cover' && (
             <span
@@ -128,7 +138,7 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
                 color: brand.primaryColor,
               }}
             >
-              <Flame size={12} /> Post Novo
+              <Flame size={12} /> {slide.topBadge || 'Post Novo'}
             </span>
           )}
           <span
@@ -140,28 +150,48 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
         </div>
       </div>
 
-      {/* CORPO CENTRAL DO SLIDE */}
-      <div className="relative z-10 my-auto py-4 flex flex-col justify-center">
-        {/* Tag Superior */}
+      {/* CORPO CENTRAL DO SLIDE - com posicionamento livre opcional */}
+      <div className="relative z-10 my-auto py-4 flex flex-col justify-center w-full">
+        {/* Tag Superior - com posicao livre opcional */}
         {slide.tag && (
-          <div className="mb-3.5">
-            <span
-              className="inline-block text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-md"
-              style={{
-                backgroundColor: `${brand.primaryColor}20`,
-                color: brand.primaryColor,
-                borderLeft: `3px solid ${brand.primaryColor}`,
-              }}
-            >
-              {slide.tag}
-            </span>
+          <div
+            style={posStyle(slide.tagPos)}
+            className={slide.tagPos ? '' : 'mb-3.5'}
+          >
+            {!slide.tagPos && (
+              <span
+                className="inline-block text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-md"
+                style={{
+                  backgroundColor: `${brand.primaryColor}20`,
+                  color: brand.primaryColor,
+                  borderLeft: `3px solid ${brand.primaryColor}`,
+                }}
+              >
+                {slide.tag}
+              </span>
+            )}
+            {slide.tagPos && (
+              <span
+                className="inline-block text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-md"
+                style={{
+                  backgroundColor: `${brand.primaryColor}20`,
+                  color: brand.primaryColor,
+                  borderLeft: `3px solid ${brand.primaryColor}`,
+                }}
+              >
+                {slide.tag}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Título Principal */}
+        {/* Título Principal - com posicao livre opcional */}
         <h2
-          className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-[1.2] mb-3"
+          className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-[1.2] mb-3 ${
+            slide.titlePos ? '' : ''
+          }`}
           style={{
+            ...(slide.titlePos ? posStyle(slide.titlePos) : {}),
             fontFamily: brand.fontHeadline,
             color: brand.textColor,
           }}
@@ -169,21 +199,27 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
           {slide.title}
         </h2>
 
-        {/* Texto de Destaque com Cor Primária */}
+        {/* Texto de Destaque */}
         {slide.highlightText && (
           <p
             className="text-xl sm:text-2xl font-bold leading-snug mb-4"
-            style={{ color: brand.primaryColor }}
+            style={{
+              ...(slide.highlightPos ? posStyle(slide.highlightPos) : {}),
+              color: brand.primaryColor,
+            }}
           >
             {slide.highlightText}
           </p>
         )}
 
-        {/* Subtítulo / Descrição */}
+        {/* Subtítulo */}
         {slide.subtitle && (
           <p
             className="text-sm sm:text-base leading-relaxed font-normal opacity-90 max-w-xl"
-            style={{ color: brand.accentTextColor }}
+            style={{
+              ...(slide.subtitlePos ? posStyle(slide.subtitlePos) : {}),
+              color: brand.accentTextColor,
+            }}
           >
             {slide.subtitle}
           </p>
@@ -191,7 +227,10 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
 
         {/* Lista de Pontos / Checklist */}
         {slide.bodyList && slide.bodyList.length > 0 && (
-          <div className="mt-4 space-y-2.5">
+          <div
+            className="mt-4 space-y-2.5"
+            style={posStyle(slide.bodyListPos)}
+          >
             {slide.bodyList.map((item, idx) => (
               <div
                 key={idx}
@@ -210,9 +249,9 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
           </div>
         )}
 
-        {/* Botão de Chamada para Ação (se houver no slide CTA) */}
+        {/* Botão de Chamada para Ação */}
         {slide.ctaButton && (
-          <div className="mt-6">
+          <div className="mt-6" style={posStyle(slide.ctaPos)}>
             <div
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm shadow-xl transition-all"
               style={{
@@ -227,10 +266,14 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
         )}
       </div>
 
-      {/* FOOTER DO SLIDE */}
+      {/* FOOTER DO SLIDE - agora 100% personalizável */}
       <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs opacity-75">
         <div className="flex items-center gap-2">
-          {slide.badge ? (
+          {slide.bottomLeft ? (
+            <span className="font-semibold text-[11px] tracking-wide" style={{ color: brand.primaryColor }}>
+              {slide.bottomLeft}
+            </span>
+          ) : slide.badge ? (
             <span className="font-semibold text-[11px] tracking-wide" style={{ color: brand.primaryColor }}>
               {slide.badge}
             </span>
@@ -240,10 +283,12 @@ export const SlideCanvas: React.FC<SlideCanvasProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 text-[11px]">
-            <Bookmark size={13} style={{ color: brand.primaryColor }} />
-            <span>Salvar post</span>
-          </div>
+          {slide.bottomRight && (
+            <div className="flex items-center gap-1 text-[11px]">
+              <Bookmark size={13} style={{ color: brand.primaryColor }} />
+              <span>{slide.bottomRight}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { usePersistedState } from '@/lib/usePersistedState';
+import { PosControl } from '@/components/PosControl';
 
 interface SlideEditorProps {
   slide: CarouselSlide;
@@ -662,6 +663,89 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             />
           </div>
         )}
+
+        {/* TEXTOS PERSONALIZADOS DO HEADER E FOOTER */}
+        <div className="pt-3 border-t border-white/10 space-y-2">
+          <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">
+            ✏️ Textos Editáveis do Slide
+          </p>
+
+          {/* Top Badge (apenas slide cover) */}
+          {slide.type === 'cover' && (
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-400 mb-1">
+                Badge Superior (ex: 🔥 NOVO, 🚀 LANÇAMENTO)
+              </label>
+              <input
+                type="text"
+                value={slide.topBadge || ''}
+                onChange={(e) => handleChange('topBadge', e.target.value)}
+                placeholder="🔥 Post Novo"
+                className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Bottom Left */}
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-400 mb-1">
+              Texto Inferior Esquerdo (CTA do carrossel)
+            </label>
+            <input
+              type="text"
+              value={slide.bottomLeft || ''}
+              onChange={(e) => handleChange('bottomLeft', e.target.value)}
+              placeholder="DESLIZE PARA VER O PASSO A PASSO →"
+              className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Bottom Right */}
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-400 mb-1">
+              Texto Inferior Direito (Call to Action)
+            </label>
+            <input
+              type="text"
+              value={slide.bottomRight || ''}
+              onChange={(e) => handleChange('bottomRight', e.target.value)}
+              placeholder="📌 Salvar post"
+              className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Sliders de posição livre para textos */}
+          <p className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider mt-3 mb-1">
+            📐 Posições X/Y dos Textos (opcional)
+          </p>
+
+          {/* Tag position */}
+          {slide.tag && (
+            <PosControl label="Tag" pos={slide.tagPos} onChange={(p) => handleChange('tagPos', p)} />
+          )}
+          {/* Title position */}
+          <PosControl label="Título" pos={slide.titlePos} onChange={(p) => handleChange('titlePos', p)} />
+          {/* Highlight position */}
+          {slide.highlightText && (
+            <PosControl label="Destaque" pos={slide.highlightPos} onChange={(p) => handleChange('highlightPos', p)} />
+          )}
+          {/* Subtitle position */}
+          {slide.subtitle && (
+            <PosControl label="Subtítulo" pos={slide.subtitlePos} onChange={(p) => handleChange('subtitlePos', p)} />
+          )}
+          {/* CTA position */}
+          {slide.ctaButton && (
+            <PosControl label="CTA" pos={slide.ctaPos} onChange={(p) => handleChange('ctaPos', p)} />
+          )}
+          {/* BodyList position */}
+          {slide.bodyList && slide.bodyList.length > 0 && (
+            <PosControl
+              label="Lista"
+              pos={slide.bodyListPos}
+              onChange={(p) => handleChange('bodyListPos', p)}
+            />
+          )}
+        </div>
       </div>
 
       {/* Galeria de imagens geradas */}
