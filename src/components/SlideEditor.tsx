@@ -1,6 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CarouselSlide, TemplateStyle } from '@/types';
-import { Type, Sparkles, Plus, Trash2, Layout, Sliders, ChevronDown, Image as ImageIcon, Loader2 } from 'lucide-react';
+import {
+  Type,
+  Sparkles,
+  Plus,
+  Trash2,
+  Layout,
+  Image as ImageIcon,
+  Loader2,
+  Wand2,
+  Check,
+  Upload,
+  X,
+  ZoomIn,
+  ZoomOut,
+  Layers,
+} from 'lucide-react';
+import { usePersistedState } from '@/lib/usePersistedState';
 
 interface SlideEditorProps {
   slide: CarouselSlide;
@@ -18,6 +34,26 @@ interface SlideEditorProps {
   provider?: 'openai';
 }
 
+const TEMPLATE_OPTIONS: { value: TemplateStyle; label: string; emoji: string; desc: string }[] = [
+  { value: 'tech-modern', label: 'Tech Modern', emoji: '🚀', desc: 'Glows e grid futurista' },
+  { value: 'glassmorphism', label: 'Glassmorphism', emoji: '💎', desc: 'Vidro fosco e profundidade' },
+  { value: 'neo-brutalist', label: 'Neo Brutalist', emoji: '🟧', desc: 'Bordas fortes, alto contraste' },
+  { value: 'minimalist-dark', label: 'Minimalist Dark', emoji: '⚫', desc: 'Tipografia limpa, foco no texto' },
+];
+
+const AI_MODELS = [
+  { value: 'auto', label: '⭐ Auto (melhor → mais barato)' },
+  { value: 'gpt-image-2.5-sunburst', label: '💎 2.5 Sunburst (Premium, $0.20)' },
+  { value: 'gpt-image-2.5-flare', label: '⚡ 2.5 Flare (Rápido, $0.10)' },
+  { value: 'gpt-image-2.5', label: '🔷 2.5 (Top, $0.15)' },
+  { value: 'gpt-image-2', label: '🆕 2 (Novo, $0.05)' },
+  { value: 'gpt-image-1.5', label: '🌟 1.5 (Excelente)' },
+  { value: 'gpt-image-1', label: '✨ 1 (Recomendado, $0.02)' },
+  { value: 'gpt-image-1-mini', label: '💰 1 Mini (Econômico)' },
+  { value: 'dall-e-3', label: '🎨 DALL-E 3 (Clássico)' },
+  { value: 'dall-e-2', label: '🏷️ DALL-E 2 (Básico)' },
+];
+
 export const SlideEditor: React.FC<SlideEditorProps> = ({
   slide,
   index,
@@ -33,48 +69,31 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
   onOpenSettings,
   provider,
 }) => {
-  const [imagePrompt, setImagePrompt] = useState('');
+  // Estados persistidos
+  const [imagePrompt, setImagePrompt] = usePersistedState<string>('slide_image_prompt', '');
+  const [referenceImage, setReferenceImage] = usePersistedState<string | null>('slide_ref_image', null);
+  const [selectedModel, setSelectedModel] = usePersistedState<string>('slide_model', 'auto');
+  const [refineInstruction, setRefineInstruction] = usePersistedState<string>('slide_refine_instruction', '');
+  const [variationsCount, setVariationsCount] = usePersistedState<number>('slide_variations_count', 4);
   const [isGeneratingImg, setIsGeneratingImg] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [bulkVariations, setBulkVariations] = useState<string[]>([]);
+  const [refinementHistory, setRefinementHistory] = useState<
+    { instruction: string; result: string }[]
+  >([]);
   const [imgError, setImgError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>('auto');
+  const [generatedGallery, setGeneratedGallery] = useState<string[]>([]);
+  const [showGallery, setShowGallery] = useState(false);
 
-  const handleGenerateAiImage = async () => {
-    if (!apiKey) {
-      onOpenSettings();
-      return;
-    }
-    const promptToUse =
-      imagePrompt ||
-      `Professional 3D glassmorphism abstract background illustration, dark aesthetic, theme: ${slide.title}`;
+  const refInputRef = useRef<HTMLInputElement>(null);
 
-    setIsGeneratingImg(true);
-    setImgError(null);
+  // Resetar histórico quando o slide muda
+  useEffect(() => {
+    setRefinementHistory([]);
+  }, [slide.id]);
 
-    try {
-      const endpoint = '/api/generate-image';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: promptToUse,
-          apiKey,
-          size: '1024x1024',
-          aspectRatio: '1:1',
-          provider: 'openai',
-          preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao gerar imagem.');
-      }
-      handleChange('imageUrl', data.imageUrl);
-    } catch (err: any) {
-      setImgError(err.message || `Erro ao conectar à OpenAI.`);
-    } finally {
-      setIsGeneratingImg(false);
-    }
-  };
   const handleChange = (field: keyof CarouselSlide, val: any) => {
     onUpdateSlide({ ...slide, [field]: val });
   };
@@ -95,9 +114,156 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
     handleChange('bodyList', list);
   };
 
+  // === Geração de imagem ===
+  const handleGenerateAiImage = async () => {
+    if (!apiKey) {
+      onOpenSettings();
+      return;
+    }
+    const promptToUse =
+      imagePrompt ||
+      `Professional ${templateStyle} background illustration, dark aesthetic, theme: ${slide.title}`;
+
+    setIsGeneratingImg(true);
+    setImgError(null);
+
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptToUse,
+          apiKey,
+          size: '1024x1024',
+          aspectRatio: aspectRatio === '4:5' ? '4:5' : aspectRatio === '9:16' ? '9:16' : '1:1',
+          provider: 'openai',
+          preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
+          ...(referenceImage ? { imageBase64: referenceImage.replace(/^data:image\/\w+;base64,/, '') } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao gerar imagem.');
+      }
+      handleChange('imageUrl', data.imageUrl);
+      setGeneratedGallery((prev) => [data.imageUrl, ...prev].slice(0, 12));
+    } catch (err: any) {
+      setImgError(err.message || `Erro ao conectar à OpenAI.`);
+    } finally {
+      setIsGeneratingImg(false);
+    }
+  };
+
+  // === Refinamento iterativo ===
+  const handleRefine = async () => {
+    if (!apiKey || !slide.imageUrl) {
+      if (!apiKey) onOpenSettings();
+      return;
+    }
+    if (!refineInstruction.trim()) return;
+
+    setIsRefining(true);
+    setImgError(null);
+
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `${refineInstruction}. Maintain the composition and style of the reference image but apply this change.`,
+          apiKey,
+          size: '1024x1024',
+          aspectRatio: aspectRatio === '4:5' ? '4:5' : aspectRatio === '9:16' ? '9:16' : '1:1',
+          provider: 'openai',
+          preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
+          imageBase64: slide.imageUrl.replace(/^data:image\/\w+;base64,/, ''),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao refinar.');
+
+      setRefinementHistory((prev) => [
+        { instruction: refineInstruction, result: data.imageUrl },
+        ...prev,
+      ].slice(0, 5));
+      handleChange('imageUrl', data.imageUrl);
+      setGeneratedGallery((prev) => [data.imageUrl, ...prev].slice(0, 12));
+      setRefineInstruction('');
+    } catch (err: any) {
+      setImgError(err.message || 'Erro ao refinar.');
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  // === Variações em massa ===
+  const handleBulkGenerate = async () => {
+    if (!apiKey) {
+      onOpenSettings();
+      return;
+    }
+    const promptToUse =
+      imagePrompt ||
+      `Professional ${templateStyle} background illustration, dark aesthetic, theme: ${slide.title}`;
+
+    setIsBulkGenerating(true);
+    setBulkVariations([]);
+    setBulkProgress({ current: 0, total: variationsCount });
+
+    const sizeMap: any = {
+      '4:5': '1024x1280',
+      '1:1': '1024x1024',
+      '9:16': '1024x1792',
+    };
+
+    const newVariations: string[] = [];
+    for (let i = 0; i < variationsCount; i++) {
+      try {
+        const res = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: promptToUse,
+            apiKey,
+            size: sizeMap[aspectRatio] || '1024x1024',
+            aspectRatio,
+            provider: 'openai',
+            preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.imageUrl) {
+          newVariations.push(data.imageUrl);
+          setBulkVariations([...newVariations]);
+          setGeneratedGallery((prev) => [data.imageUrl, ...prev].slice(0, 12));
+        }
+      } catch (err) {
+        console.error('Erro na variação', i, err);
+      }
+      setBulkProgress({ current: i + 1, total: variationsCount });
+    }
+
+    if (newVariations.length > 0) {
+      handleChange('imageUrl', newVariations[0]);
+    }
+    setIsBulkGenerating(false);
+  };
+
+  // === Upload de imagem de referência ===
+  const handleAddRefImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setReferenceImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    if (refInputRef.current) refInputRef.current.value = '';
+  };
+
   return (
     <div className="space-y-6 bg-[#0e111a] border border-white/10 p-6 rounded-3xl shadow-xl">
-      {/* SELETORES GLOBAIS DE DESIGN */}
+      {/* ============ SELETORES GLOBAIS ============ */}
       <div className="pb-5 border-b border-white/10 space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -135,26 +301,40 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           <label className="block text-[11px] font-semibold text-gray-400 mb-1.5">
             Tema Visual do Carrossel
           </label>
-          <select
-            value={templateStyle}
-            onChange={(e) => onChangeTemplateStyle(e.target.value as TemplateStyle)}
-            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold focus:outline-none"
-          >
-            <option value="tech-modern" className="bg-[#11131a]">Tech Modern (Glows & Grid)</option>
-            <option value="glassmorphism" className="bg-[#11131a]">Glassmorphism (Vidro & Desfoque)</option>
-            <option value="neo-brutalist" className="bg-[#11131a]">Neo Brutalist (Bordas fortes & Alto Contraste)</option>
-            <option value="minimalist-dark" className="bg-[#11131a]">Minimalist Dark (Tipografia limpa)</option>
-          </select>
+          <div className="grid grid-cols-2 gap-2">
+            {TEMPLATE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onChangeTemplateStyle(opt.value)}
+                className={`text-left px-3 py-2 rounded-xl border transition-all ${
+                  templateStyle === opt.value
+                    ? 'bg-brand-500/15 border-brand-500 text-white'
+                    : 'bg-white/[0.02] border-white/5 text-gray-300 hover:bg-white/[0.05]'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">{opt.emoji}</span>
+                  <span className="text-[11px] font-bold leading-tight">{opt.label}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* HEADER DA EDIÇÃO DO SLIDE ATUAL */}
+      {/* ============ HEADER DO SLIDE ============ */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-white">
             Editando Slide {String(index + 1).padStart(2, '0')} de {String(totalSlides).padStart(2, '0')}
           </h3>
-          <p className="text-xs text-gray-400">Tipo de tela: {slide.type.toUpperCase()}</p>
+          <p className="text-xs text-gray-400">
+            Tipo: {slide.type.toUpperCase()}
+            {refinementHistory.length > 0 && (
+              <span className="ml-2 text-purple-400">• {refinementHistory.length} refinamento(s)</span>
+            )}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -176,9 +356,9 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
         </div>
       </div>
 
-      {/* CAMPOS DO SLIDE */}
+      {/* ============ CAMPOS DE TEXTO ============ */}
       <div className="space-y-4">
-        {/* Tag / Categoria Superior */}
+        {/* Tag */}
         <div>
           <label className="block text-[11px] font-semibold text-gray-400 mb-1">
             Tag Superior (Categoria / Chamada)
@@ -192,7 +372,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           />
         </div>
 
-        {/* Título Principal */}
+        {/* Título */}
         <div>
           <label className="block text-[11px] font-semibold text-gray-400 mb-1">
             Título Principal (Headline)
@@ -205,7 +385,7 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           />
         </div>
 
-        {/* Texto de Destaque Colorido */}
+        {/* Destaque */}
         <div>
           <label className="block text-[11px] font-semibold text-gray-400 mb-1">
             Frase de Destaque (Cor da Marca)
@@ -232,11 +412,11 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           />
         </div>
 
-        {/* Gerador de Imagem/Fundo por IA (OpenAI) */}
+        {/* ============ GERADOR DE IMAGEM DE FUNDO ============ */}
         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-              <ImageIcon size={14} className="text-purple-400" /> Imagem de Fundo (IA OpenAI)
+              <ImageIcon size={14} className="text-purple-400" /> Imagem de Fundo (IA)
             </label>
             {!apiKey ? (
               <button
@@ -250,12 +430,58 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             )}
           </div>
 
+          {/* Modelo selector */}
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-[11px] font-semibold focus:border-brand-500 focus:outline-none"
+          >
+            {AI_MODELS.map((m) => (
+              <option key={m.value} value={m.value} className="bg-[#11131a]">
+                {m.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Imagem de referência (opcional) */}
+          <input
+            ref={refInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAddRefImage}
+            className="hidden"
+          />
+          {referenceImage ? (
+            <div className="relative">
+              <img
+                src={referenceImage}
+                alt="ref"
+                className="w-full h-16 object-cover rounded-md"
+              />
+              <button
+                onClick={() => setReferenceImage(null)}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center"
+                title="Remover referência"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => refInputRef.current?.click()}
+              className="w-full text-[10px] text-gray-400 hover:text-brand-400 border border-dashed border-white/10 rounded-md py-1.5"
+            >
+              + Anexar imagem de referência (estilo/paleta)
+            </button>
+          )}
+
+          {/* Prompt + botão de gerar */}
           <div className="flex gap-2">
             <input
               type="text"
               value={imagePrompt}
               onChange={(e) => setImagePrompt(e.target.value)}
-              placeholder="Ex: 3D geometric abstract glass rendering, dark background..."
+              placeholder="Ex: 3D geometric glass rendering, dark theme, professional..."
               className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
             />
             <button
@@ -275,17 +501,101 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
             </button>
           </div>
 
-          {/* Seletor de modelo */}
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-[11px] font-semibold focus:border-brand-500 focus:outline-none"
-          >
-            <option value="auto" className="bg-[#11131a]">⭐ Auto (melhor → mais barato)</option>
-            <option value="gpt-image-2.5-sunburst" className="bg-[#11131a]">💎 gpt-image-2.5-sunburst (Premium)</option>
-            <option value="gpt-image-2.5-flare" className="bg-[#11131a]">⚡ gpt-image-2.5-flare (Rápido)</option>
-            <option value="gpt-image-2" className="bg-[#11131a]">🆕 gpt-image-2</option>
-          </select>
+          {/* Variações em massa */}
+          <div className="pt-2 border-t border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers size={11} /> Variações em Massa
+              </span>
+              <select
+                value={variationsCount}
+                onChange={(e) => setVariationsCount(Number(e.target.value))}
+                className="bg-transparent text-[10px] text-gray-300 focus:outline-none"
+              >
+                <option value={2} className="bg-[#11131a]">2x</option>
+                <option value={4} className="bg-[#11131a]">4x</option>
+                <option value={6} className="bg-[#11131a]">6x</option>
+                <option value={8} className="bg-[#11131a]">8x</option>
+              </select>
+            </div>
+            <button
+              onClick={handleBulkGenerate}
+              disabled={isBulkGenerating}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25 transition-all disabled:opacity-50"
+            >
+              {isBulkGenerating ? (
+                <>
+                  <Loader2 size={11} className="animate-spin" /> Gerando {bulkProgress.current}/{bulkProgress.total}...
+                </>
+              ) : (
+                <>
+                  <Layers size={11} /> Gerar {variationsCount} Variações
+                </>
+              )}
+            </button>
+            {isBulkGenerating && (
+              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-400 transition-all"
+                  style={{
+                    width: `${bulkProgress.total > 0 ? (bulkProgress.current / bulkProgress.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Refinamento iterativo (só se já tem imagem) */}
+          {slide.imageUrl && (
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Wand2 size={11} /> Refinar Imagem Atual
+              </span>
+              <input
+                type="text"
+                value={refineInstruction}
+                onChange={(e) => setRefineInstruction(e.target.value)}
+                placeholder="Ex: mude a iluminação para azul neon"
+                className="w-full px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-white text-[11px] focus:border-purple-500 focus:outline-none"
+              />
+              <button
+                onClick={handleRefine}
+                disabled={isRefining || !refineInstruction.trim()}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-all disabled:opacity-50"
+              >
+                {isRefining ? (
+                  <>
+                    <Loader2 size={11} className="animate-spin" /> Refinando...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 size={11} /> Refinar Imagem
+                  </>
+                )}
+              </button>
+              {refinementHistory.length > 0 && (
+                <div className="grid grid-cols-4 gap-1">
+                  {refinementHistory.map((h, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleChange('imageUrl', h.result)}
+                      className="relative group"
+                      title={h.instruction}
+                    >
+                      <img
+                        src={h.result}
+                        alt={`v${i + 1}`}
+                        className="w-full aspect-square object-cover rounded border border-white/10 hover:border-purple-500"
+                      />
+                      <span className="absolute bottom-0 inset-x-0 bg-purple-500 text-[8px] text-white text-center py-0.5 opacity-0 group-hover:opacity-100 truncate px-1">
+                        {h.instruction}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {imgError && (
             <p className="text-[11px] text-red-400 font-medium">{imgError}</p>
@@ -353,6 +663,39 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Galeria de imagens geradas */}
+      {generatedGallery.length > 0 && (
+        <div className="pt-3 border-t border-white/10">
+          <button
+            onClick={() => setShowGallery(!showGallery)}
+            className="w-full flex items-center justify-between text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-2"
+          >
+            <span className="flex items-center gap-1.5">
+              <ImageIcon size={12} /> Galeria ({generatedGallery.length})
+            </span>
+            <span>{showGallery ? '▲' : '▼'}</span>
+          </button>
+          {showGallery && (
+            <div className="grid grid-cols-4 gap-2">
+              {generatedGallery.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleChange('imageUrl', img)}
+                  className="relative group rounded overflow-hidden border border-white/10 hover:border-brand-500"
+                >
+                  <img src={img} alt="" className="w-full aspect-square object-cover" />
+                  {img === slide.imageUrl && (
+                    <div className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
+                      <Check size={16} className="text-brand-400" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
