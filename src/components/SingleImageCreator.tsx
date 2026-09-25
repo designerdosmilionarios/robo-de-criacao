@@ -194,8 +194,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [headlineFont, setHeadlineFont] = usePersistedState<string>('single_headline_font', brand.fontHeadline);
   const [textAlignment, setTextAlignment] = usePersistedState<'left' | 'center'>('single_text_align', 'left');
 
-  // CONFIGURACOES TIPOGRAFICAS AVANCADAS (um TypographyConfig por texto)
-  const [tagConfig, setTagConfig] = useState<TypographyConfig>({
+  // CONFIGURACOES TIPOGRAFICAS AVANCADAS (um TypographyConfig por texto) - PERSISTIDAS
+  const [tagConfig, setTagConfig] = usePersistedState<TypographyConfig>('single_tag_config_full', {
     ...DEFAULT_TYPOGRAPHY,
     fontFamily: brand.fontHeadline,
     fontSize: 14,
@@ -204,7 +204,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     useUppercase: true,
     letterSpacing: 1,
   });
-  const [headlineConfig, setHeadlineConfig] = useState<TypographyConfig>({
+  const [headlineConfig, setHeadlineConfig] = usePersistedState<TypographyConfig>('single_headline_config_full', {
     ...DEFAULT_TYPOGRAPHY,
     fontFamily: brand.fontHeadline,
     fontSize: 48,
@@ -213,14 +213,14 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     lineHeight: 1.05,
     letterSpacing: -1.5,
   });
-  const [highlightConfig, setHighlightConfig] = useState<TypographyConfig>({
+  const [highlightConfig, setHighlightConfig] = usePersistedState<TypographyConfig>('single_highlight_config_full', {
     ...DEFAULT_TYPOGRAPHY,
     fontFamily: brand.fontHeadline,
     fontSize: 24,
     fontWeight: '700',
     color: brand.primaryColor,
   });
-  const [sublineConfig, setSublineConfig] = useState<TypographyConfig>({
+  const [sublineConfig, setSublineConfig] = usePersistedState<TypographyConfig>('single_subline_config_full', {
     ...DEFAULT_TYPOGRAPHY,
     fontFamily: brand.fontBody,
     fontSize: 14,
@@ -228,7 +228,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     color: brand.accentTextColor,
     lineHeight: 1.5,
   });
-  const [ctaConfig, setCtaConfig] = useState<TypographyConfig>({
+  const [ctaConfig, setCtaConfig] = usePersistedState<TypographyConfig>('single_cta_config_full', {
     ...DEFAULT_TYPOGRAPHY,
     fontFamily: brand.fontHeadline,
     fontSize: 14,
