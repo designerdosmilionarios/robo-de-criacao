@@ -747,6 +747,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           ['subline', 'Texto / Subtítulo'],
           ['highlight', 'Texto / Destaque'],
           ['headline', 'Texto / Headline'],
+          ['tag', 'Texto / Tag'],
           ['topbar', 'Barra superior / Tag / Selo'],
           ['text-overlay', 'Degradê de contraste dos textos'],
           ['logo', 'Logo'],
@@ -761,6 +762,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           if (!element.querySelector(`[data-psd-layer="${id}"]`)) continue;
           const layerDataUrl = await captureCanvasPng(element, id);
           layers.push({
+            id,
             name,
             canvas: await dataUrlToCanvas(layerDataUrl, currentFormat.width, currentFormat.height),
           });
@@ -804,6 +806,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       const rect = node.getBoundingClientRect();
       const fontScale = Math.min(scaleX, scaleY);
       return [{
+        id,
         name,
         text,
         x: (rect.left - rootRect.left) * scaleX,
@@ -822,6 +825,22 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       }];
     });
   };
+
+  const logoPresetX = logoPosition.includes('left')
+    ? 0
+    : logoPosition.includes('right')
+    ? 100
+    : 50;
+  const logoPresetY = logoPosition.includes('top')
+    ? 0
+    : logoPosition.includes('bottom')
+    ? 100
+    : 50;
+  const logoTransform = logoXY
+    ? 'translate(-50%, -50%)'
+    : `translate(${logoPosition.includes('left') ? '0' : logoPosition.includes('right') ? '-100%' : '-50%'}, ${
+        logoPosition.includes('top') ? '0' : logoPosition.includes('bottom') ? '-100%' : '-50%'
+      })`;
 
 
   return (
@@ -1016,10 +1035,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   data-psd-layer="logo"
                   className={`absolute z-30 p-6 sm:p-8 ${selectedCanvasEl === 'logo' ? 'outline outline-2 outline-emerald-400 outline-offset-[-8px]' : ''}`}
                   style={{
-                    left: `${logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50)}%`,
+                    left: `${logoXY?.x ?? logoPresetX}%`,
                     right: 'auto',
-                    top: `${logoXY?.y ?? (logoPosition.includes('top') ? 0 : logoPosition.includes('bottom') ? 100 : 50)}%`,
-                    transform: 'translate(-50%, -50%)',
+                    top: `${logoXY?.y ?? logoPresetY}%`,
+                    transform: logoTransform,
                   }}
                 >
                   <img
@@ -1121,7 +1140,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                   {/* TOPO: BARRA SUPERIOR 100% EDITAVEL POR ELEMENTO COM POSICAO X/Y */}
                   {showTopBar && (
                     <div
-                      data-psd-layer="topbar"
                       className={`flex items-center gap-3 flex-wrap self-stretch mb-3 ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}
                       style={{
                         position: tagPos ? 'absolute' : 'static',
@@ -1134,6 +1152,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       {/* TAG com tipografia customizada */}
                       {showTag && tag && tagConfig.visible && (
                         <span
+                          data-psd-layer="tag"
                           data-psd-native-text="tag"
                           className="inline-flex items-center gap-1.5 shadow-sm"
                           style={{
@@ -1153,6 +1172,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       {/* HANDLE / TEXTO CUSTOMIZADO */}
                       {showHandle && (
                         <span
+                          data-psd-layer="topbar"
                           className="text-[11px] font-bold tracking-tight opacity-75"
                           style={{ color: brand.textColor }}
                         >
@@ -1162,17 +1182,17 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
 
                       {/* SELO DE AUTORIDADE / BADGE */}
                       {showBadge && selectedBadge === 'stars' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">
+                        <span data-psd-layer="topbar" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">
                           <Star size={11} className="fill-amber-400" /> 5.0 (Avaliação Máxima)
                         </span>
                       )}
                       {showBadge && selectedBadge === 'verified' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/30">
+                        <span data-psd-layer="topbar" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/30">
                           <Shield size={11} /> 100% Verificado
                         </span>
                       )}
                       {showBadge && selectedBadge === 'bestseller' && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-400/20 text-purple-300 text-[10px] font-bold border border-purple-400/30">
+                        <span data-psd-layer="topbar" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-400/20 text-purple-300 text-[10px] font-bold border border-purple-400/30">
                           <Award size={11} /> Mais Vendido
                         </span>
                       )}
@@ -1550,16 +1570,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     <div>
                       <div className="flex items-center justify-between text-[9px] font-bold text-gray-400 mb-0.5">
                         <span>X (horizontal)</span>
-                        <span>{Math.round(logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50))}%</span>
+                        <span>{Math.round(logoXY?.x ?? logoPresetX)}%</span>
                       </div>
                       <input
                         type="range"
                         min="0"
                         max="100"
-                        value={logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50)}
+                        value={logoXY?.x ?? logoPresetX}
                         onChange={(e) => {
                           const x = Number(e.target.value);
-                          setLogoXY((prev) => ({ x, y: prev?.y ?? 50 }));
+                          setLogoXY((prev) => ({ x, y: prev?.y ?? logoPresetY }));
                         }}
                         className="w-full accent-amber-500"
                       />
@@ -1567,16 +1587,16 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                     <div>
                       <div className="flex items-center justify-between text-[9px] font-bold text-gray-400 mb-0.5">
                         <span>Y (vertical)</span>
-                        <span>{Math.round(logoXY?.y ?? (logoPosition.includes('top') ? 0 : logoPosition.includes('bottom') ? 100 : 50))}%</span>
+                        <span>{Math.round(logoXY?.y ?? logoPresetY)}%</span>
                       </div>
                       <input
                         type="range"
                         min="0"
                         max="100"
-                        value={logoXY?.y ?? (logoPosition.includes('top') ? 0 : logoPosition.includes('bottom') ? 100 : 50)}
+                        value={logoXY?.y ?? logoPresetY}
                         onChange={(e) => {
                           const y = Number(e.target.value);
-                          setLogoXY((prev) => ({ x: prev?.x ?? 50, y }));
+                          setLogoXY((prev) => ({ x: prev?.x ?? logoPresetX, y }));
                         }}
                         className="w-full accent-amber-500"
                       />
