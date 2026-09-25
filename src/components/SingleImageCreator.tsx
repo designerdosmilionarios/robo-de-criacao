@@ -109,8 +109,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [gradientOpacity, setGradientOpacity] = usePersistedState<number>('single_grad_opacity', 100);
 
   // Glows de marca (esferas coloridas desfocadas no fundo)
-  const [showBrandGlows, setShowBrandGlows] = useState(true);
-  const [glowIntensity, setGlowIntensity] = useState(35);
+  const [showBrandGlows, setShowBrandGlows] = usePersistedState<boolean>('single_show_glows', true);
+  const [glowIntensity, setGlowIntensity] = usePersistedState<number>('single_glow_intensity', 35);
 
   // Overlay de degradê para contraste de leitura
   const [textOverlay, setTextOverlay] = usePersistedState<GradientOverlayConfig>(
@@ -120,8 +120,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
 
   // SELECAO E DRAG DIRETO NO CANVAS (mais controle sem ir no painel direito)
   const [selectedCanvasEl, setSelectedCanvasEl] = useState<'logo' | 'text' | 'person' | null>(null);
-  const [logoXY, setLogoXY] = useState<{ x: number; y: number } | null>(null);
-  const [personXY, setPersonXY] = useState<{ x: number; y: number } | null>(null);
+  const [logoXY, setLogoXY] = usePersistedState<{ x: number; y: number } | null>('single_logo_xy', null);
+  const [personXY, setPersonXY] = usePersistedState<{ x: number; y: number } | null>('single_person_xy', null);
   const [textBlockXY, setTextBlockXY] = useState<{ x: number; y: number }>({ x: 50, y: 80 });
 
   // Posicao X/Y individual para cada texto (em %)
@@ -172,10 +172,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [selectedBadge, setSelectedBadge] = useState<string | null>('none');
 
   // Controles de visibilidade do topo (cada cliente decide)
-  const [showTopBar, setShowTopBar] = useState(true);
-  const [showTag, setShowTag] = useState(true);
-  const [showHandle, setShowHandle] = useState(true);
-  const [showBadge, setShowBadge] = useState(true);
+  const [showTopBar, setShowTopBar] = usePersistedState<boolean>('single_show_topbar', true);
+  const [showTag, setShowTag] = usePersistedState<boolean>('single_show_tag', true);
+  const [showHandle, setShowHandle] = usePersistedState<boolean>('single_show_handle', true);
+  const [showBadge, setShowBadge] = usePersistedState<boolean>('single_show_badge', true);
   const [customTopText, setCustomTopText] = useState('');
 
   // Configuração da marca - usar handle real ou nome padrão
@@ -191,7 +191,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [subline, setSubline] = usePersistedState<string>('single_subline', 'Aprenda o passo a passo validado por especialistas.');
   const [ctaText, setCtaText] = usePersistedState<string>('single_cta_text', 'QUERO APRENDER AGORA');
   const [showCta, setShowCta] = usePersistedState<boolean>('single_show_cta', true);
-  const [headlineFont, setHeadlineFont] = useState(brand.fontHeadline);
+  const [headlineFont, setHeadlineFont] = usePersistedState<string>('single_headline_font', brand.fontHeadline);
   const [textAlignment, setTextAlignment] = usePersistedState<'left' | 'center'>('single_text_align', 'left');
 
   // CONFIGURACOES TIPOGRAFICAS AVANCADAS (um TypographyConfig por texto)
