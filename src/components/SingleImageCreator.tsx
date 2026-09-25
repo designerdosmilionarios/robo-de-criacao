@@ -33,6 +33,7 @@ import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
 import { optimizeImageDataUrl } from '@/lib/imageData';
 import { CreativeDirectorPanel } from '@/components/CreativeDirectorPanel';
+import { buildDirectedPrompt } from '@/lib/creativeDirector';
 import {
   TypographyControl,
   DEFAULT_TYPOGRAPHY,
@@ -97,9 +98,39 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
   const [selectedModel, setSelectedModel] = usePersistedState<string>('single_model', 'auto');
 
+  // =========================================
+  // Direção artística (paridade com carrossel)
+  // =========================================
+  const [artDirection, setArtDirection] = usePersistedState<'minimalista' | 'editorial' | 'dramatico' | 'cinematografico'>(
+    'single_art_direction',
+    'editorial'
+  );
+  const [visualCategory, setVisualCategory] = usePersistedState<string>('single_visual_category', 'citacao');
+  const [artBriefing, setArtBriefing] = usePersistedState<string>('single_art_briefing', '');
+
   useEffect(() => {
     if (!SUPPORTED_IMAGE_MODELS.includes(selectedModel)) setSelectedModel('auto');
   }, [selectedModel, setSelectedModel]);
+
+  // Compõe o prompt com base na direção artística (ou cai pro bgPrompt cru)
+  const composePromptForGeneration = (): string => {
+    const hasDirection = !!(artDirection || visualCategory || artBriefing);
+    const supportsPerson = artDirection === 'dramatico' || artDirection === 'cinematografico';
+    if (!hasDirection) {
+      return bgPrompt || 'premium dark cinematic background for advertising';
+    }
+    const composed = buildDirectedPrompt({
+      briefing: artBriefing || headline || 'Criativo único',
+      direction: artDirection,
+      visualCategory,
+      style: 'premium',
+      personPhoto: supportsPerson && !!personImage,
+    });
+    return composed.prompt;
+  };
+
+  // Foto do personagem tem prioridade sobre referenceImage para preservar identidade
+  const getIdentityImage = (): string | null => personImage || referenceImage;
 
   // Degradê customizado (PERSISTIDO)
   const [useGradient, setUseGradient] = usePersistedState<boolean>('single_use_gradient', true);
@@ -294,6 +325,9 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         generatedGallery,
         editMode,
         selectedModel,
+        artDirection,
+        visualCategory,
+        artBriefing,
       },
       load: (data: any) => {
         if (data.format) setFormat(data.format);
@@ -340,6 +374,9 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if (Array.isArray(data.generatedGallery)) setGeneratedGallery(data.generatedGallery);
         if (data.editMode === 'auto' || data.editMode === 'free') setEditMode(data.editMode);
         if (typeof data.selectedModel === 'string') setSelectedModel(data.selectedModel);
+        if (data.artDirection) setArtDirection(data.artDirection);
+        if (data.visualCategory) setVisualCategory(data.visualCategory);
+        if (typeof data.artBriefing === 'string') setArtBriefing(data.artBriefing);
       },
     });
   }, [
@@ -388,6 +425,9 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     generatedGallery,
     editMode,
     selectedModel,
+    artDirection,
+    visualCategory,
+    artBriefing,
   ]);
 
   // Sincronizar imagem externa enviada do Estúdio de Poses
@@ -451,7 +491,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       setBgError('Configure sua chave de API no topo antes de gerar.');
       return;
     }
-    if (!bgPrompt && !referenceImage) {
+    if (!bgPrompt && !referenceImage && !artDirection && !visualCategory && !artBriefing) {
       setBgError('Digite um prompt ou anexe uma imagem de referência visual.');
       return;
     }
@@ -468,16 +508,19 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         '1:1': '1024x1024',
       };
 
+      const promptToUse = composePromptForGeneration();
+      const identityImage = getIdentityImage();
+
       const requestBody: any = {
-        prompt: bgPrompt || 'premium dark cinematic background for advertising',
+        prompt: promptToUse,
         size: sizeMap[format],
         aspectRatio: format,
         preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
         apiKey,
       };
 
-      if (referenceImage) {
-        requestBody.imageBase64 = await optimizeImageDataUrl(referenceImage);
+      if (identityImage) {
+        requestBody.imageBase64 = await optimizeImageDataUrl(identityImage);
       }
 
       const res = await fetch(endpoint, {
@@ -510,7 +553,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       setBgError('Configure sua chave de API antes.');
       return;
     }
-    if (!bgPrompt && !referenceImage) {
+    if (!bgPrompt && !referenceImage && !artDirection && !visualCategory && !artBriefing) {
       setBgError('Digite um prompt antes de gerar variações.');
       return;
     }
@@ -525,22 +568,24 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       '1:1': '1024x1024',
     };
 
-    const variations: string[] = [];
-    const optimizedReference = referenceImage
-      ? await optimizeImageDataUrl(referenceImage)
+    const promptToUse = composePromptForGeneration();
+    const optimizedIdentity = getIdentityImage()
+      ? await optimizeImageDataUrl(getIdentityImage()!)
       : null;
+
+    const variations: string[] = [];
     for (let i = 0; i < variationsCount; i++) {
       try {
         const res = await fetch('/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: bgPrompt || 'premium dark cinematic background for advertising',
+            prompt: promptToUse,
             size: sizeMap[format],
             aspectRatio: format,
             preferredModel: selectedModel !== 'auto' ? selectedModel : undefined,
             apiKey,
-            ...(optimizedReference ? { imageBase64: optimizedReference } : {}),
+            ...(optimizedIdentity ? { imageBase64: optimizedIdentity } : {}),
           }),
         });
         const data = await res.json();
@@ -1839,6 +1884,13 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
               secondaryColor: brand.secondaryColor,
               backgroundColor: brand.backgroundColor,
             }}
+            initialArtDirection={artDirection}
+            initialVisualCategory={visualCategory}
+            initialArtBriefing={artBriefing}
+            personImage={personImage}
+            onChangeArtDirection={(d) => setArtDirection(d)}
+            onChangeVisualCategory={(id) => setVisualCategory(id)}
+            onChangeArtBriefing={(b) => setArtBriefing(b)}
           />
 
           {/* SEÇÃO 4: PESSOA REAL */}

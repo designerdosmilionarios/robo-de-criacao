@@ -39,6 +39,16 @@ interface CreativeDirectorPanelProps {
     secondaryColor: string;
     backgroundColor: string;
   };
+  // Valores iniciais da direção artística (carregados do projeto salvo)
+  initialArtDirection?: 'minimalista' | 'editorial' | 'dramatico' | 'cinematografico';
+  initialVisualCategory?: string;
+  initialArtBriefing?: string;
+  // Foto do personagem (pai passa para injetar no prompt composto)
+  personImage?: string | null;
+  // Callbacks para persistir mudanças da direção artística (paridade com SlideEditor)
+  onChangeArtDirection?: (d: 'minimalista' | 'editorial' | 'dramatico' | 'cinematografico') => void;
+  onChangeVisualCategory?: (id: string) => void;
+  onChangeArtBriefing?: (b: string) => void;
 }
 
 export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
@@ -49,6 +59,13 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
   onApplyCta,
   onApplyTag,
   brandColors,
+  initialArtDirection = 'editorial',
+  initialVisualCategory = 'citacao',
+  initialArtBriefing = '',
+  personImage,
+  onChangeArtDirection,
+  onChangeVisualCategory,
+  onChangeArtBriefing,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ecommerce');
   const [selectedStyle, setSelectedStyle] = useState<string>('premium');
@@ -57,11 +74,24 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // === NOVO: Direção Artística ===
-  const [artDirection, setArtDirection] = useState<ArtDirectionLevel>('editorial');
-  const [visualCategoryId, setVisualCategoryId] = useState<string>('citacao');
-  const [briefing, setBriefing] = useState<string>('');
+  const [artDirection, setArtDirection] = useState<ArtDirectionLevel>(initialArtDirection);
+  const [visualCategoryId, setVisualCategoryId] = useState<string>(initialVisualCategory);
+  const [briefing, setBriefing] = useState<string>(initialArtBriefing);
+
+  // Sincroniza com props externas quando mudam (carregamento de projeto salvo)
+  useEffect(() => {
+    setArtDirection(initialArtDirection);
+  }, [initialArtDirection]);
+  useEffect(() => {
+    setVisualCategoryId(initialVisualCategory);
+  }, [initialVisualCategory]);
+  useEffect(() => {
+    setBriefing(initialArtBriefing);
+  }, [initialArtBriefing]);
   const [showPromptPreview, setShowPromptPreview] = useState<boolean>(false);
   const [editedPrompt, setEditedPrompt] = useState<string>('');
+
+  const supportsPerson = artDirection === 'dramatico' || artDirection === 'cinematografico';
 
   const directedPrompt = useMemo(
     () =>
@@ -73,8 +103,9 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
         brandColors: brandColors
           ? `${brandColors.primaryColor}, ${brandColors.secondaryColor}, ${brandColors.backgroundColor}`
           : undefined,
+        personPhoto: supportsPerson && !!personImage,
       }),
-    [briefing, artDirection, visualCategoryId, selectedStyle, brandColors]
+    [briefing, artDirection, visualCategoryId, selectedStyle, brandColors, personImage, supportsPerson]
   );
 
   // Sincroniza o prompt editável quando o prompt dirigido muda (e o modal não está aberto editando)
@@ -151,7 +182,10 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
           </label>
           <textarea
             value={briefing}
-            onChange={(e) => setBriefing(e.target.value)}
+            onChange={(e) => {
+              setBriefing(e.target.value);
+              onChangeArtBriefing?.(e.target.value);
+            }}
             placeholder="Ex: Carrossel sobre vencer a crise com propósito, público 30-45 anos, tom motivacional"
             rows={2}
             className="w-full px-2.5 py-1.5 rounded-xl bg-black/30 border border-white/10 text-white text-[11px] focus:border-purple-500 focus:outline-none resize-none"
@@ -167,7 +201,10 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
             {ART_DIRECTIONS.map((d) => (
               <button
                 key={d.id}
-                onClick={() => setArtDirection(d.id)}
+                onClick={() => {
+                setArtDirection(d.id);
+                onChangeArtDirection?.(d.id);
+              }}
                 className={`py-2 px-2 rounded-xl text-[10px] font-bold border transition-all text-left ${
                   artDirection === d.id
                     ? 'bg-pink-500/25 border-pink-500 text-white shadow-lg shadow-pink-500/10'
@@ -205,7 +242,11 @@ export const CreativeDirectorPanel: React.FC<CreativeDirectorPanelProps> = ({
               return (
                 <button
                   key={cat.id}
-                  onClick={() => !disabled && setVisualCategoryId(cat.id)}
+                  onClick={() => {
+                  if (disabled) return;
+                  setVisualCategoryId(cat.id);
+                  onChangeVisualCategory?.(cat.id);
+                }}
                   disabled={disabled}
                   className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all text-left flex items-center gap-1.5 ${
                     visualCategoryId === cat.id

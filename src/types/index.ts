@@ -207,6 +207,12 @@ export interface SavedSingleImageData {
   editMode?: 'auto' | 'free';
   freeLayers?: Array<Record<string, unknown>>;
   selectedModel?: string;
+  // =========================================
+  // Direção artística (paridade com carrossel)
+  // =========================================
+  artDirection?: 'minimalista' | 'editorial' | 'dramatico' | 'cinematografico';
+  visualCategory?: string;
+  artBriefing?: string;
 }
 
 export interface SavedPoseData {
