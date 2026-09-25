@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { usePersistedState } from '@/lib/usePersistedState';
-import { BrandKit, LocalFont } from '@/types';
 import {
   User,
   Upload,
@@ -15,68 +13,133 @@ import {
   CheckCircle2,
   Lightbulb,
   RefreshCw,
+  Plus,
+  Image as ImageIcon,
   Save,
 } from 'lucide-react';
-import saveAs from 'file-saver';
-import { optimizeImageDataUrl } from '@/lib/imageData';
+import { usePersistedState } from '@/lib/usePersistedState';
+import { BrandKit } from '@/types';
 
 interface PoseStudioProps {
   brand: BrandKit;
   apiKey: string;
-  provider: 'openai';
+  provider: 'openai' | 'Opus 4.8';
   onSendToCreative: (imageUrl: string) => void;
   onRegisterControls?: (controls: { state: any; load: (data: any) => void }) => void;
   onSaveRequest?: () => void;
 }
 
+// =====================================
+// 15 POSES PROFISSIONAIS
+// Inclui corpo inteiro, meio corpo e rosto
+// =====================================
 const PRESET_POSES = [
   {
     id: 'pointing-left',
     label: '👉 Apontando para o lado',
-    desc: 'Ideal para direcionar o olhar para a headline ou botão',
+    desc: 'Direciona o olhar para headline/botão',
     promptPart: 'pointing finger confidently towards the left side of the frame, engaging eye contact with viewer',
+    category: 'meio-corpo',
   },
   {
     id: 'arms-crossed',
-    label: '💼 Braços cruzados (Autoridade)',
-    desc: 'Transmite segurança, profissionalismo e liderança',
+    label: '💼 Braços cruzados',
+    desc: 'Autoridade, segurança e liderança',
     promptPart: 'standing with arms crossed, confident and friendly smile, executive posture, looking directly into the camera',
+    category: 'meio-corpo',
   },
   {
     id: 'holding-phone',
     label: '📱 Segurando celular',
-    desc: 'Mostrando resultados, aplicativo ou notificações',
+    desc: 'Mostrando resultados, app ou notificação',
     promptPart: 'holding a modern smartphone showing screen slightly towards camera, excited and positive expression',
+    category: 'meio-corpo',
   },
   {
     id: 'laptop-working',
     label: '💻 No notebook',
-    desc: 'Trabalho remoto, escala digital e produtividade',
+    desc: 'Trabalho remoto, produtividade',
     promptPart: 'sitting at a sleek modern desk working on a high-end laptop, glancing up with a welcoming confident smile',
+    category: 'meio-corpo',
   },
   {
     id: 'shocked-surprised',
     label: '😲 Surpreso / Revelação',
-    desc: 'Gatilho de curiosidade para anúncios de alto CTR',
+    desc: 'Gatilho de curiosidade para alto CTR',
     promptPart: 'amazed facial expression, hands near face or holding head in surprise, wide eyes, conveying unbelievable news',
+    category: 'rosto',
   },
   {
     id: 'speaking-podcast',
     label: '🎙️ Palestra / Podcast',
-    desc: 'Posicionamento de mentor, autoridade e especialista',
+    desc: 'Mentor, autoridade, especialista',
     promptPart: 'speaking dynamically with hands gesturing naturally, wearing a minimalist lapel mic or near studio microphone',
+    category: 'meio-corpo',
   },
   {
     id: 'thinking-solution',
     label: '🤔 Reflexivo / Estratégico',
-    desc: 'Mão no queixo analisando soluções e métricas',
+    desc: 'Analisando soluções e métricas',
     promptPart: 'hand touching chin thoughtfully, intelligent focused look, looking slightly off-camera then smiling',
+    category: 'rosto',
   },
   {
     id: 'thumbs-up',
     label: '👍 Aprovando / Positivo',
-    desc: 'Validação, depoimento ou recomendação',
+    desc: 'Validação, depoimento',
     promptPart: 'giving a confident thumbs up gesture with right hand, warm approachable smile, approved concept',
+    category: 'meio-corpo',
+  },
+  // ===== NOVAS POSES DE CORPO INTEIRO =====
+  {
+    id: 'fullbody-walking',
+    label: '🚶 Andando com confiança',
+    desc: 'Corpo inteiro, postura profissional dinâmica',
+    promptPart: 'full body shot walking confidently towards camera with purposeful stride, modern business attire, modern architectural background, dynamic composition',
+    category: 'corpo-inteiro',
+  },
+  {
+    id: 'fullbody-handoff',
+    label: '🤝 Estendendo a mão',
+    desc: 'Corpo inteiro, chamado para ação',
+    promptPart: 'full body shot extending right hand forward in handshake or offering gesture, welcoming smile, professional attire, clean studio environment',
+    category: 'corpo-inteiro',
+  },
+  {
+    id: 'fullbody-confident',
+    label: '🕴️ Pose de poder',
+    desc: 'Corpo inteiro, posição de autoridade',
+    promptPart: 'full body shot with hands in pockets or arms crossed in confident power pose, executive stance, modern office with city view through window',
+    category: 'corpo-inteiro',
+  },
+  {
+    id: 'fullbody-laptop-sitting',
+    label: '💻 Sentado no laptop (café)',
+    desc: 'Corpo inteiro, lifestyle trabalho remoto',
+    promptPart: 'full body shot sitting casually at a trendy cafe table with laptop and coffee cup, relaxed confident pose, natural light streaming through window, work-life balance vibe',
+    category: 'corpo-inteiro',
+  },
+  {
+    id: 'fullbody-stairs',
+    label: '🏛️ Subindo escada',
+    desc: 'Corpo inteiro, ascensão profissional',
+    promptPart: 'full body shot walking up modern architectural stairs with confidence, low angle camera looking up at subject, success and growth metaphor, dynamic composition',
+    category: 'corpo-inteiro',
+  },
+  // ===== POSES ESPECIAIS =====
+  {
+    id: 'pointing-up',
+    label: '☝️ Apontando para cima',
+    desc: 'Para chamar atenção para elementos acima',
+    promptPart: 'pointing finger confidently upward, eye contact with camera, suggesting look up or growth, dynamic and energetic pose',
+    category: 'rosto',
+  },
+  {
+    id: 'reading-book',
+    label: '📚 Lendo livro',
+    desc: 'Educador, autor, referência',
+    promptPart: 'reading a book holding it open with both hands, looking up thoughtfully towards camera, intellectual and welcoming, soft warm lighting',
+    category: 'meio-corpo',
   },
 ];
 
@@ -85,13 +148,28 @@ const ATTIRE_OPTIONS = [
   { id: 'smart-casual', label: '👕 Casual Elegante / Tech', prompt: 'wearing a clean premium dark fitted crewneck t-shirt or modern blazer with neutral shirt' },
   { id: 'medical', label: '🩺 Jaleco / Saúde', prompt: 'wearing a pristine professional white medical lab coat or modern scrub' },
   { id: 'streetwear', label: '🧢 Criativo / Despojado', prompt: 'wearing a stylish streetwear hoodie or minimalist oversized jacket, contemporary aesthetic' },
+  { id: 'fitness', label: '💪 Fitness / Esportivo', prompt: 'wearing athletic sportswear with fitted performance shirt, healthy and energetic appearance' },
+  { id: 'wedding-elegant', label: '👰 Noiva / Cerimônia', prompt: 'wearing an elegant sophisticated white or champagne dress, formal ceremony look' },
 ];
 
 const BACKGROUND_OPTIONS = [
-  { id: 'transparent', label: '✂️ Fundo Neutro / Estúdio (Fácil de Recortar)', prompt: 'solid studio gray seamless backdrop, clean edge lighting, isolated character' },
-  { id: 'office-luxury', label: '🏢 Escritório Moderno de Alto Padrão', prompt: 'in a modern high-end minimalist corporate office with soft bokeh and ambient warm lights in background' },
+  { id: 'transparent', label: '✂️ Fundo Neutro / Estúdio', prompt: 'solid studio gray seamless backdrop, clean edge lighting, isolated character' },
+  { id: 'office-luxury', label: '🏢 Escritório Moderno Premium', prompt: 'in a modern high-end minimalist corporate office with soft bokeh and ambient warm lights in background' },
   { id: 'dark-cyber', label: '🌌 Tech Dark com Neon Suave', prompt: 'in a moody dark cinematic studio with subtle cyan and purple rim lighting, cinematic depth of field' },
   { id: 'home-office', label: '🛋️ Home Office Aconchegante', prompt: 'in a clean aesthetic cozy modern home office with warm interior design and soft natural light' },
+  { id: 'urban-street', label: '🌆 Rua Urbana / Cidade', prompt: 'in a modern city street with soft bokeh of buildings and lights behind, urban lifestyle' },
+  { id: 'nature-park', label: '🌳 Parque / Natureza', prompt: 'in a lush green park with trees and natural soft sunlight, lifestyle and wellness aesthetic' },
+  { id: 'cafe-rustic', label: '☕ Café Rústico', prompt: 'in a cozy rustic coffee shop with warm wood tones, plants and natural lighting' },
+];
+
+// =====================================
+// RESOLUCOES DISPONIVEIS
+// =====================================
+const RESOLUTIONS = [
+  { value: '1024x1024', label: '1:1 Quadrado (1080x1080)', for: 'Instagram Feed Quadrado' },
+  { value: '1024x1536', label: '2:3 Vertical (1080x1620)', for: 'Pinterest, Stories' },
+  { value: '1536x1024', label: '3:2 Horizontal (1620x1080)', for: 'Banner, Capa Facebook' },
+  { value: '1080x1350', label: '4:5 Feed IG Portrait (1080x1350)', for: '⭐ Instagram Feed Portrait' },
 ];
 
 export const PoseStudio: React.FC<PoseStudioProps> = ({
@@ -102,61 +180,95 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
   onRegisterControls,
   onSaveRequest,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // Estados persistidos (sobrevive a mudanca de aba)
-  const [faceImage, setFaceImage] = usePersistedState<string | null>('pose_face_image', null);
+  const faceInputRef = useRef<HTMLInputElement>(null);
+  const poseInputRef = useRef<HTMLInputElement>(null);
+
+  // ESTADOS PERSISTIDOS (sobrevive a troca de aba)
+  const [faceImages, setFaceImages] = usePersistedState<string[]>('pose_face_images', []);
+  const [poseReference, setPoseReference] = usePersistedState<string | null>('pose_reference', null);
   const [selectedPose, setSelectedPose] = usePersistedState<string>('pose_selected', PRESET_POSES[0].id);
   const [selectedAttire, setSelectedAttire] = usePersistedState<string>('pose_attire', ATTIRE_OPTIONS[0].id);
   const [selectedBg, setSelectedBg] = usePersistedState<string>('pose_bg', BACKGROUND_OPTIONS[0].id);
+  const [selectedResolution, setSelectedResolution] = usePersistedState<string>('pose_resolution', '1080x1350');
   const [customDetails, setCustomDetails] = usePersistedState<string>('pose_details', '');
   const [generatedPoses, setGeneratedPoses] = usePersistedState<string[]>('pose_generated', []);
 
-  // Estados nao persistidos (resetam a cada sessao)
+  // ESTADOS DE SESSAO (resetam)
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Registrar estado + função de load para o componente pai poder salvar/carregar projetos
+  // Registrar estado + load para o componente pai
   useEffect(() => {
     if (!onRegisterControls) return;
     onRegisterControls({
       state: {
+        faceImages,
+        poseReference,
         selectedPose,
         selectedAttire,
         selectedBg,
+        selectedResolution,
         customDetails,
         generatedPoses,
-        faceImage,
       },
       load: (data: any) => {
+        if (Array.isArray(data.faceImages)) setFaceImages(data.faceImages);
+        if ('poseReference' in data) setPoseReference(data.poseReference);
         if (data.selectedPose) setSelectedPose(data.selectedPose);
         if (data.selectedAttire) setSelectedAttire(data.selectedAttire);
         if (data.selectedBg) setSelectedBg(data.selectedBg);
+        if (data.selectedResolution) setSelectedResolution(data.selectedResolution);
         if ('customDetails' in data) setCustomDetails(data.customDetails || '');
         if (Array.isArray(data.generatedPoses)) setGeneratedPoses(data.generatedPoses);
-        if ('faceImage' in data) setFaceImage(data.faceImage || null);
       },
     });
   }, [
     onRegisterControls,
+    faceImages,
+    poseReference,
     selectedPose,
     selectedAttire,
     selectedBg,
+    selectedResolution,
     customDetails,
     generatedPoses,
-    faceImage,
   ]);
 
-  const handleUploadFace = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Adicionar foto do rosto (multiplas)
+  const handleAddFace = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (faceImages.length >= 3) {
+      alert('Maximo de 3 fotos de referencia do rosto.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFaceImages((prev) => [...prev, reader.result as string]);
+    };
+    reader.readAsDataURL(file);
+    if (faceInputRef.current) faceInputRef.current.value = '';
+  };
+
+  // Adicionar referencia da pose
+  const handleAddPoseRef = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setFaceImage(reader.result as string);
+    reader.onload = () => {
+      setPoseReference(reader.result as string);
+    };
     reader.readAsDataURL(file);
+    if (poseInputRef.current) poseInputRef.current.value = '';
+  };
+
+  const handleRemoveFace = (idx: number) => {
+    setFaceImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleGeneratePose = async () => {
-    if (!apiKey) {
-      setError('Configure sua chave de API no botão "Chave API" no topo antes de continuar.');
+    if (faceImages.length === 0) {
+      alert('Adicione pelo menos uma foto do rosto para a IA manter a consistencia facial.');
       return;
     }
 
@@ -168,45 +280,34 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
       const attireObj = ATTIRE_OPTIONS.find((a) => a.id === selectedAttire);
       const bgObj = BACKGROUND_OPTIONS.find((b) => b.id === selectedBg);
 
-      // Construir prompt avançado com foco em consistência facial de pessoa real
       const fullPrompt = [
-        'Masterpiece ultra-realistic 8k medium shot photograph of a real person.',
-        faceImage
-          ? 'Maintain exact facial features, bone structure, skin texture, ethnicity, facial hair, and likeness of the person in the reference image.'
-          : 'Realistic professional Brazilian person in their 30s with natural skin texture and authentic look.',
-        `Pose and action: ${poseObj?.promptPart || 'standing confidently'}.`,
-        `Attire: ${attireObj?.prompt}.`,
-        `Environment: ${bgObj?.prompt}.`,
+        `Professional ${poseObj?.category === 'corpo-inteiro' ? 'full body' : 'medium shot'} commercial photography, ${poseObj?.promptPart || ''}`,
+        `Attire: ${attireObj?.prompt || ''}`,
+        `Environment: ${bgObj?.prompt || ''}`,
         customDetails ? `Additional details: ${customDetails}.` : '',
-        'Cinematic lighting, Canon EOS R5 85mm f/1.4 lens, natural skin pores, hyper-realistic, professional commercial grade, photorealistic, no cartoon, no airbrushed doll look.',
+        `Maintain exact facial features, bone structure, skin texture, ethnicity, and likeness of the person in the reference image. Ultra-detailed, 8k, hyper-realistic, professional color grading, editorial quality`,
+        `Composition: leave clean space on the right or left for text overlay to be added later`,
       ]
         .filter(Boolean)
-        .join(' ');
+        .join('. ');
 
       const endpoint = '/api/generate-image';
-
-      const requestBody: any = {
-        prompt: fullPrompt,
-        size: '1024x1024',
-        aspectRatio: '1:1',
-        provider: 'openai',
-        apiKey,
-      };
-
-      if (faceImage) {
-        requestBody.imageBase64 = await optimizeImageDataUrl(faceImage);
-      }
-
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          size: selectedResolution,
+          aspectRatio: '4:5', // OpenAI usa ratios
+          preferredModel: 'auto',
+          apiKey,
+          imageBase64: faceImages[0].replace(/^data:image\/\w+;base64,/, ''),
+        }),
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao gerar nova pose.');
+      if (!res.ok) throw new Error(data.error || 'Erro ao gerar pose.');
 
-      setGeneratedPoses((prev: string[]) => [data.imageUrl, ...prev]);
+      setGeneratedPoses((prev) => [data.imageUrl, ...prev]);
     } catch (err: any) {
       setError(err.message || 'Erro ao comunicar com a IA.');
     } finally {
@@ -214,250 +315,341 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
     }
   };
 
+  // Agrupa poses por categoria
+  const posesByCategory = {
+    'corpo-inteiro': PRESET_POSES.filter((p) => p.category === 'corpo-inteiro'),
+    'meio-corpo': PRESET_POSES.filter((p) => p.category === 'meio-corpo'),
+    rosto: PRESET_POSES.filter((p) => p.category === 'rosto'),
+  };
+
   return (
-    <div className="space-y-8">
-      {/* HEADER DA ABA */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
+    <div className="space-y-6">
+      {/* HEADER */}
+      <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-tr from-purple-500/20 to-brand-500/20 text-brand-400 border border-brand-500/30 shadow-lg">
+            <div className="p-3 rounded-2xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
               <User size={24} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold text-white">Estúdio de Pessoas & Novas Poses</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30">
                   Face Consistency AI
                 </span>
               </div>
               <p className="text-sm text-gray-400">
-                Envie uma foto do rosto e gere a mesma pessoa em dezenas de poses para seus anúncios.
+                Envie fotos do rosto, escolha a pose e gere dezenas de variações consistentes.
               </p>
             </div>
           </div>
-        </div>
-
-        {/* GRID DE CONFIGURAÇÃO */}
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* COLUNA ESQUERDA: FOTO DE ROSTO DE REFERÊNCIA (4 cols) */}
-          <div className="lg:col-span-4 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                <Camera size={14} className="text-brand-400" /> 1. Foto do Rosto (Referência)
-              </label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleUploadFace}
-                className="hidden"
-              />
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="cursor-pointer border-2 border-dashed border-white/15 hover:border-brand-500/50 rounded-2xl p-6 flex flex-col items-center justify-center bg-white/[0.02] hover:bg-white/[0.04] transition-all min-h-[220px]"
-              >
-                {faceImage ? (
-                  <div className="relative w-full text-center">
-                    <img
-                      src={faceImage}
-                      alt="Rosto de Referência"
-                      className="w-36 h-36 mx-auto rounded-full object-cover border-4 border-brand-500/30 shadow-2xl"
-                    />
-                    <p className="text-xs text-brand-400 font-bold mt-3">Foto anexada com sucesso!</p>
-                    <p className="text-[11px] text-gray-400">Clique para trocar a imagem</p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFaceImage(null);
-                      }}
-                      className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-                      title="Remover foto"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="p-3 rounded-full bg-white/5 text-gray-400 mb-3">
-                      <Upload size={24} />
-                    </div>
-                    <p className="text-sm font-semibold text-gray-200">Anexe uma foto do cliente/rosto</p>
-                    <p className="text-xs text-gray-500 mt-1 text-center max-w-xs">
-                      Selfie, foto do Instagram ou imagem corporativa bem iluminada
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Dica PRO */}
-            <div className="p-4 rounded-2xl bg-brand-500/5 border border-brand-500/15 flex items-start gap-3">
-              <Lightbulb size={18} className="text-brand-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-gray-300 leading-relaxed">
-                <strong className="text-brand-400">Dica de Direção de Arte:</strong> Fotos com rosto olhando pra frente e boa iluminação garantem o melhor resultado na hora da IA recriar o rosto na pose escolhida.
-              </p>
-            </div>
-          </div>
-
-          {/* COLUNA DIREITA: SELETOR DE POSES, ROUPA E CENÁRIO (8 cols) */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* Poses */}
-            <div>
-              <label className="block text-xs font-bold text-gray-300 mb-2.5 uppercase tracking-wider">
-                2. Escolha a Nova Pose da Pessoa
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {PRESET_POSES.map((pose) => (
-                  <button
-                    key={pose.id}
-                    onClick={() => setSelectedPose(pose.id)}
-                    className={`p-3 rounded-2xl text-left border transition-all ${
-                      selectedPose === pose.id
-                        ? 'bg-brand-500/10 border-brand-500 text-white shadow-lg shadow-brand-500/10'
-                        : 'bg-white/[0.03] border-white/10 text-gray-300 hover:border-white/20'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs">{pose.label}</span>
-                      {selectedPose === pose.id && (
-                        <CheckCircle2 size={15} className="text-brand-400" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">{pose.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Vestimenta e Cenário */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <Briefcase size={14} className="text-brand-400" /> 3. Roupa / Vestimenta
-                </label>
-                <select
-                  value={selectedAttire}
-                  onChange={(e) => setSelectedAttire(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold focus:outline-none focus:border-brand-500"
-                >
-                  {ATTIRE_OPTIONS.map((att) => (
-                    <option key={att.id} value={att.id} className="bg-[#11131a]">
-                      {att.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles size={14} className="text-brand-400" /> 4. Cenário de Fundo
-                </label>
-                <select
-                  value={selectedBg}
-                  onChange={(e) => setSelectedBg(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold focus:outline-none focus:border-brand-500"
-                >
-                  {BACKGROUND_OPTIONS.map((bg) => (
-                    <option key={bg.id} value={bg.id} className="bg-[#11131a]">
-                      {bg.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Detalhes extras opcionais */}
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-400 mb-1.5">
-                Detalhe Extra / Instrução Livre (Opcional)
-              </label>
-              <input
-                type="text"
-                value={customDetails}
-                onChange={(e) => setCustomDetails(e.target.value)}
-                placeholder="Ex: segurando cartão de crédito preto, óculos de grau modernos, iluminação dourada..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
-              />
-            </div>
-
-            {/* Botão de Ação */}
-            <div className="pt-2">
-              <button
-                onClick={handleGeneratePose}
-                disabled={isGenerating}
-                className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-xl shadow-brand-500/20 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" /> Criando Pessoa na Nova Pose com IA...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={18} /> Gerar Pessoa Nesta Pose (OpenAI)
-                  </>
-                )}
-              </button>
-              {error && <p className="text-xs text-red-400 font-medium mt-2 text-center">{error}</p>}
-
-              {/* Botão Salvar Projeto */}
-              {onSaveRequest && (
-                <button
-                  onClick={onSaveRequest}
-                  className="mt-3 w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all"
-                >
-                  <Save size={14} /> Salvar Projeto
-                </button>
-              )}
-            </div>
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+            <span className="text-[10px] font-bold text-gray-400">RESOLUÇÃO</span>
+            <select
+              value={selectedResolution}
+              onChange={(e) => setSelectedResolution(e.target.value)}
+              className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
+            >
+              {RESOLUTIONS.map((r) => (
+                <option key={r.value} value={r.value} className="bg-[#11131a]">
+                  {r.value}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
 
-      {/* GALERIA DE RESULTADOS GERADOS */}
-      {generatedPoses.length > 0 && (
-        <div className="p-6 sm:p-8 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles size={18} className="text-brand-400" /> Poses Criadas para seus Anúncios
+      {/* GRID 2 COLUNAS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* COLUNA ESQUERDA: FOTOS DE REFERENCIA */}
+        <div className="space-y-4">
+          {/* FOTOS DO ROSTO (ate 3) */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Camera size={14} className="text-emerald-400" /> Fotos do Rosto
+                <span className="text-[9px] text-gray-500">(até 3)</span>
               </h3>
-              <p className="text-xs text-gray-400">
-                Clique em "Usar no Criativo Único" para montar o anúncio com essa pessoa.
-              </p>
+              {faceImages.length < 3 && (
+                <button
+                  onClick={() => faceInputRef.current?.click()}
+                  className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300"
+                >
+                  + Adicionar
+                </button>
+              )}
             </div>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10">
-              {generatedPoses.length} {generatedPoses.length === 1 ? 'pose gerada' : 'poses geradas'}
-            </span>
+            <input
+              ref={faceInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAddFace}
+              className="hidden"
+            />
+            {faceImages.length === 0 ? (
+              <button
+                onClick={() => faceInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-white/10 hover:border-emerald-500/40 rounded-2xl py-8 px-4 text-center transition-all bg-emerald-500/[0.02]"
+              >
+                <Upload size={24} className="text-emerald-400 mx-auto mb-2" />
+                <p className="text-sm font-bold text-white">Adicionar foto do rosto</p>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Selfie ou foto do Instagram bem iluminada
+                </p>
+              </button>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {faceImages.map((img, i) => (
+                  <div key={i} className="relative group">
+                    <img
+                      src={img}
+                      alt={`Rosto ${i + 1}`}
+                      className="w-full aspect-square object-cover rounded-xl border-2 border-emerald-500/30"
+                    />
+                    <button
+                      onClick={() => handleRemoveFace(i)}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                    <div className="absolute bottom-1 left-1 right-1 text-[9px] text-white bg-black/60 backdrop-blur-sm rounded px-1 py-0.5 text-center">
+                      Foto {i + 1}
+                    </div>
+                  </div>
+                ))}
+                {faceImages.length < 3 && (
+                  <button
+                    onClick={() => faceInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-white/10 hover:border-emerald-500/40 rounded-xl flex items-center justify-center transition-all"
+                  >
+                    <Plus size={20} className="text-gray-500" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {generatedPoses.map((img, idx) => (
-              <div
-                key={idx}
-                className="group relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-xl flex flex-col"
+          {/* REFERENCIA DA POSE (opcional) */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <ImageIcon size={14} className="text-blue-400" /> Referência da Pose
+                <span className="text-[9px] text-gray-500">(opcional)</span>
+              </h3>
+              {poseReference && (
+                <button
+                  onClick={() => setPoseReference(null)}
+                  className="text-[10px] text-red-400"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            <input
+              ref={poseInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAddPoseRef}
+              className="hidden"
+            />
+            {!poseReference ? (
+              <button
+                onClick={() => poseInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-white/10 hover:border-blue-500/40 rounded-2xl py-6 px-4 text-center transition-all bg-blue-500/[0.02]"
               >
-                <div className="aspect-square relative overflow-hidden">
-                  <img
-                    src={img}
-                    alt={`Pose gerada ${idx + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
+                <ImageIcon size={20} className="text-blue-400 mx-auto mb-1" />
+                <p className="text-xs font-bold text-white">Foto de referência de pose</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">A IA vai copiar a pose dessa foto</p>
+              </button>
+            ) : (
+              <div className="relative">
+                <img
+                  src={poseReference}
+                  alt="Pose ref"
+                  className="w-full max-h-48 object-contain rounded-xl bg-white/5"
+                />
+              </div>
+            )}
+            <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">
+              💡 Anexe uma foto com a pose que você quer. A IA vai manter a pose mas trocar o rosto pela sua referência.
+            </p>
+          </div>
+        </div>
 
-                <div className="p-3.5 space-y-2 bg-[#0d0f17] border-t border-white/10">
+        {/* COLUNA DIREITA: CONFIGURACOES */}
+        <div className="space-y-4">
+          {/* ESCOLHA DA POSE - POR CATEGORIA */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+              <Sparkles size={14} className="text-purple-400" /> Escolha a Pose
+              <span className="text-[10px] text-gray-500">({PRESET_POSES.length} disponiveis)</span>
+            </h3>
+
+            {/* Corpo inteiro */}
+            <div className="mb-3">
+              <p className="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-2">
+                🧍 Corpo Inteiro ({posesByCategory['corpo-inteiro'].length})
+              </p>
+              <div className="space-y-1.5">
+                {posesByCategory['corpo-inteiro'].map((pose) => (
+                  <PoseButton
+                    key={pose.id}
+                    pose={pose}
+                    active={selectedPose === pose.id}
+                    onClick={() => setSelectedPose(pose.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Meio corpo */}
+            <div className="mb-3">
+              <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-2">
+                🧑 Meio Corpo ({posesByCategory['meio-corpo'].length})
+              </p>
+              <div className="space-y-1.5">
+                {posesByCategory['meio-corpo'].map((pose) => (
+                  <PoseButton
+                    key={pose.id}
+                    pose={pose}
+                    active={selectedPose === pose.id}
+                    onClick={() => setSelectedPose(pose.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Rosto */}
+            <div>
+              <p className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wider mb-2">
+                👤 Rosto / Expressões ({posesByCategory.rosto.length})
+              </p>
+              <div className="space-y-1.5">
+                {posesByCategory.rosto.map((pose) => (
+                  <PoseButton
+                    key={pose.id}
+                    pose={pose}
+                    active={selectedPose === pose.id}
+                    onClick={() => setSelectedPose(pose.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ROUPA + CENARIO (em 2 colunas) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-4 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+              <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+                <Briefcase size={12} /> Roupa
+              </h3>
+              <select
+                value={selectedAttire}
+                onChange={(e) => setSelectedAttire(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs"
+              >
+                {ATTIRE_OPTIONS.map((a) => (
+                  <option key={a.id} value={a.id} className="bg-[#11131a]">
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="p-4 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+              <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+                <Camera size={12} /> Cenário
+              </h3>
+              <select
+                value={selectedBg}
+                onChange={(e) => setSelectedBg(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs"
+              >
+                {BACKGROUND_OPTIONS.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-[#11131a]">
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* DETALHES EXTRAS */}
+          <div className="p-4 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl">
+            <h3 className="text-xs font-bold text-white mb-2">Detalhes Extras (Opcional)</h3>
+            <textarea
+              rows={2}
+              value={customDetails}
+              onChange={(e) => setCustomDetails(e.target.value)}
+              placeholder="Ex: segurando cartao de credito preto, oculos de grau modernos, iluminacao dourada..."
+              className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs placeholder-gray-500 focus:outline-none resize-none"
+            />
+          </div>
+
+          {/* ERRO */}
+          {error && (
+            <p className="text-xs text-red-400 font-medium">{error}</p>
+          )}
+        </div>
+      </div>
+
+      {/* BOTOES DE ACAO */}
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={handleGeneratePose}
+          disabled={isGenerating}
+          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-xl disabled:opacity-50"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 size={16} className="animate-spin" /> Gerando Pose com IA...
+            </>
+          ) : (
+            <>
+              <Sparkles size={16} /> Gerar Pessoa Nesta Pose ({provider === 'Opus 4.8' ? 'Opus 4.8' : 'OpenAI'})
+            </>
+          )}
+        </button>
+        {onSaveRequest && (
+          <button
+            onClick={onSaveRequest}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+          >
+            <Save size={14} /> Salvar Projeto
+          </button>
+        )}
+      </div>
+
+      {/* GALERIA DE POSES GERADAS */}
+      {generatedPoses.length > 0 && (
+        <div className="p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-2xl">
+          <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+            <Sparkles size={16} className="text-brand-400" /> Poses Geradas
+            <span className="text-[10px] text-gray-500">({generatedPoses.length})</span>
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {generatedPoses.map((img, idx) => (
+              <div key={idx} className="group relative rounded-xl overflow-hidden border border-white/10 hover:border-brand-500/50 transition-colors">
+                <img
+                  src={img}
+                  alt={`Pose ${idx + 1}`}
+                  className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
+                />
+                <div className="absolute inset-x-0 bottom-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/80 to-transparent">
                   <button
                     onClick={() => onSendToCreative(img)}
-                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-brand-500 text-dark-900 hover:bg-brand-400 transition-all shadow-md"
+                    className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-brand-500 text-dark-900"
                   >
-                    Usar no Criativo <ArrowRight size={13} />
+                    <ArrowRight size={10} /> Usar
                   </button>
-
-                  <button
-                    onClick={() => saveAs(img, `pose-pessoa-${idx + 1}.png`)}
-                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+                  <a
+                    href={img}
+                    download={`pose-${idx + 1}.png`}
+                    className="mt-1 w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-white/10 text-white"
                   >
-                    <Download size={12} /> Baixar Imagem
-                  </button>
+                    <Download size={10} /> Baixar
+                  </a>
                 </div>
               </div>
             ))}
@@ -467,3 +659,27 @@ export const PoseStudio: React.FC<PoseStudioProps> = ({
     </div>
   );
 };
+
+// Componente de botão de pose (extraído para limpeza)
+const PoseButton: React.FC<{
+  pose: (typeof PRESET_POSES)[number];
+  active: boolean;
+  onClick: () => void;
+}> = ({ pose, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`w-full text-left p-2.5 rounded-xl border transition-all ${
+      active
+        ? 'bg-brand-500/15 border-brand-500 text-white shadow-lg'
+        : 'bg-white/[0.02] border-white/5 text-gray-300 hover:bg-white/[0.05]'
+    }`}
+  >
+    <div className="flex items-center gap-2">
+      {active && <CheckCircle2 size={14} className="text-brand-400 shrink-0" />}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold leading-tight">{pose.label}</p>
+        <p className="text-[10px] text-gray-400 truncate">{pose.desc}</p>
+      </div>
+    </div>
+  </button>
+);
