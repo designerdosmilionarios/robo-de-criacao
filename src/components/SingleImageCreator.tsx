@@ -44,6 +44,12 @@ import { FreeCanvasEditor, CanvasLayer } from '@/components/FreeCanvasEditor';
 import { SmartTemplates, SmartTemplate, AVAILABLE_TEMPLATES } from '@/components/SmartTemplates';
 import { usePersistedState } from '@/lib/usePersistedState';
 import { BackgroundImageControl, buildBackgroundImageStyle } from '@/components/BackgroundImageControl';
+import {
+  dataUrlToCanvas,
+  exportEditablePsd,
+  exportExactPsd,
+  PsdNativeTextLayer,
+} from '@/lib/psdExport';
 import { TextGradientOverlay, buildOverlayStyle, DEFAULT_OVERLAY, GradientOverlayConfig } from '@/components/TextGradientOverlay';
 
 const SUPPORTED_IMAGE_MODELS = ['auto', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2'];
@@ -656,78 +662,165 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     }
   };
 
-  // Download do Criativo Final em alta resolução
-  const [exportingPsd, setExportingPsd] = useState(false);
+  // Exportação do criativo em PNG e PSD.
+  const [exportingPsd, setExportingPsd] = useState<'exact' | 'editable' | null>(null);
 
-const handleDownloadCanvas = async () => {
-    const el = document.getElementById('single-creative-canvas');
-    if (!el) return;
+  const waitForPaint = () => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+
+  const withCleanExportCanvas = async <T,>(
+    action: (element: HTMLElement) => Promise<T>
+  ): Promise<T> => {
+    const previousSelection = selectedCanvasEl;
+    if (previousSelection) {
+      setSelectedCanvasEl(null);
+      await waitForPaint();
+    }
+
+    const element = document.getElementById('single-creative-canvas');
+    if (!element) throw new Error('Abra o modo Layout Auto para exportar o criativo.');
+    const originalStyle = element.style.cssText;
+    element.style.setProperty('background-color', 'transparent', 'important');
+    element.style.setProperty('border', 'none', 'important');
+    element.style.setProperty('border-radius', '0', 'important');
+    element.style.setProperty('box-shadow', 'none', 'important');
+
     try {
-      const dataUrl = await toPng(el, {
-        pixelRatio: 1,
-        canvasWidth: currentFormat.width,
-        canvasHeight: currentFormat.height,
-        cacheBust: true,
-      });
-
-      saveAs(
-        dataUrl,
-        `${brand.name.toLowerCase().replace(/\s+/g, '-')}-criativo-${format.replace(':', 'x')}.png`
-      );
-    } catch (e) {
-      console.error('Erro ao baixar canvas:', e);
+      return await action(element);
+    } finally {
+      element.style.cssText = originalStyle;
+      if (previousSelection) setSelectedCanvasEl(previousSelection);
     }
   };
 
-  // EXPORTAR PSD COM CAMADAS SEPARADAS PARA PHOTOSHOP
-  const handleExportPsd = async () => {
-    setExportingPsd(true);
+  const captureCanvasPng = async (element: HTMLElement, targetLayer?: string) => toPng(element, {
+    pixelRatio: 1,
+    canvasWidth: currentFormat.width,
+    canvasHeight: currentFormat.height,
+    cacheBust: true,
+    backgroundColor: 'transparent',
+    filter: targetLayer
+      ? (node) => {
+          const layer = (node as HTMLElement).dataset?.psdLayer;
+          return !layer || layer === targetLayer;
+        }
+      : undefined,
+  });
+
+  const getPsdFileBase = () =>
+    `${brand.name}-criativo-${format.replace(':', 'x')}`;
+
+  const handleDownloadCanvas = async () => {
     try {
-      const payload = {
-        width: currentFormat.width,
-        height: currentFormat.height,
-        format: format,
-        backgroundImage: bgImage,
-        backgroundColor: brand.backgroundColor,
-        gradientColor1,
-        gradientColor2,
-        gradientAngle,
-        useGradient,
-        logoImage,
-        logoPosition,
-        logoScale,
-        personImage,
-        personPosition,
-        personScale,
-        personFlipped,
-        tag: { text: tag, ...tagConfig },
-        headline: { text: headline, ...headlineConfig },
-        highlight: { text: highlightText, ...highlightConfig },
-        subline: { text: subline, ...sublineConfig },
-        cta: { text: ctaText, ...ctaConfig },
-        brandName: brand.name,
-      };
-      const res = await fetch('/api/export-psd', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Erro ao exportar PSD');
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = brand.name.toLowerCase().replace(/s+/g, '-') + '-camadas.zip';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert('Erro ao exportar PSD: ' + err.message);
-    } finally {
-      setExportingPsd(false);
+      const dataUrl = await withCleanExportCanvas((element) => captureCanvasPng(element));
+      saveAs(dataUrl, `${getPsdFileBase().toLowerCase().replace(/\s+/g, '-')}.png`);
+    } catch (error) {
+      console.error('Erro ao baixar canvas:', error);
+      alert(error instanceof Error ? error.message : 'Não foi possível baixar o PNG.');
     }
+  };
+
+  const handleExportExactPsd = async () => {
+    setExportingPsd('exact');
+    try {
+      await withCleanExportCanvas(async (element) => {
+        const dataUrl = await captureCanvasPng(element);
+        const canvas = await dataUrlToCanvas(dataUrl, currentFormat.width, currentFormat.height);
+        await exportExactPsd(canvas, `${getPsdFileBase()}-exato`);
+      });
+    } catch (error) {
+      alert(`Erro ao gerar PSD exato: ${error instanceof Error ? error.message : 'erro desconhecido'}`);
+    } finally {
+      setExportingPsd(null);
+    }
+  };
+
+  const handleExportEditablePsd = async () => {
+    setExportingPsd('editable');
+    try {
+      await withCleanExportCanvas(async (element) => {
+        const finalDataUrl = await captureCanvasPng(element);
+        const finalCanvas = await dataUrlToCanvas(finalDataUrl, currentFormat.width, currentFormat.height);
+        const layerDefinitions = [
+          ['cta', 'CTA / Botão'],
+          ['subline', 'Texto / Subtítulo'],
+          ['highlight', 'Texto / Destaque'],
+          ['headline', 'Texto / Headline'],
+          ['topbar', 'Barra superior / Tag / Selo'],
+          ['text-overlay', 'Degradê de contraste dos textos'],
+          ['logo', 'Logo'],
+          ['person', 'Pessoa'],
+          ['brand-glows', 'Glows da marca'],
+          ['contrast-overlay', 'Contraste do fundo'],
+          ['background', 'Fundo'],
+        ] as const;
+
+        const layers = [];
+        for (const [id, name] of layerDefinitions) {
+          if (!element.querySelector(`[data-psd-layer="${id}"]`)) continue;
+          const layerDataUrl = await captureCanvasPng(element, id);
+          layers.push({
+            name,
+            canvas: await dataUrlToCanvas(layerDataUrl, currentFormat.width, currentFormat.height),
+          });
+        }
+
+        await exportEditablePsd({
+          finalCanvas,
+          layers,
+          nativeTextLayers: collectNativeTextLayers(element),
+          fileName: `${getPsdFileBase()}-editavel`,
+        });
+      });
+    } catch (error) {
+      alert(`Erro ao gerar PSD editável: ${error instanceof Error ? error.message : 'erro desconhecido'}`);
+    } finally {
+      setExportingPsd(null);
+    }
+  };
+
+  const collectNativeTextLayers = (element: HTMLElement): PsdNativeTextLayer[] => {
+    const rootRect = element.getBoundingClientRect();
+    const scaleX = currentFormat.width / rootRect.width;
+    const scaleY = currentFormat.height / rootRect.height;
+    const definitions = [
+      { id: 'tag', name: 'Texto nativo / Tag', text: tag, config: tagConfig, color: tagConfig.color },
+      { id: 'headline', name: 'Texto nativo / Headline', text: headline, config: headlineConfig, color: headlineConfig.color },
+      { id: 'highlight', name: 'Texto nativo / Destaque', text: highlightText, config: highlightConfig, color: highlightConfig.color },
+      { id: 'subline', name: 'Texto nativo / Subtítulo', text: subline, config: sublineConfig, color: sublineConfig.color },
+      {
+        id: 'cta',
+        name: 'Texto nativo / CTA',
+        text: ctaText,
+        config: ctaConfig,
+        color: ctaConfig.highlightEnabled ? ctaConfig.highlightColor : brand.backgroundColor,
+      },
+    ];
+
+    return definitions.flatMap(({ id, name, text, config, color }) => {
+      const node = element.querySelector<HTMLElement>(`[data-psd-native-text="${id}"]`);
+      if (!node || !text || !config.visible) return [];
+      const rect = node.getBoundingClientRect();
+      const fontScale = Math.min(scaleX, scaleY);
+      return [{
+        name,
+        text,
+        x: (rect.left - rootRect.left) * scaleX,
+        y: (rect.top - rootRect.top) * scaleY + config.fontSize * fontScale,
+        width: rect.width * scaleX,
+        height: rect.height * scaleY,
+        fontFamily: config.fontFamily,
+        fontSize: config.fontSize * fontScale,
+        fontWeight: config.fontWeight,
+        color,
+        textAlign: config.textAlign,
+        lineHeight: config.lineHeight,
+        letterSpacing: config.letterSpacing * fontScale,
+        uppercase: config.useUppercase,
+        underline: config.useUnderline,
+      }];
+    });
   };
 
 
@@ -867,6 +960,7 @@ const handleDownloadCanvas = async () => {
               {/* CAMADA 1: BACKGROUND (IMAGEM OU GRADIENTE) */}
               {bgImage ? (
                 <img
+                  data-psd-layer="background"
                   src={bgImage}
                   alt="Background"
                   draggable={false}
@@ -874,6 +968,7 @@ const handleDownloadCanvas = async () => {
                 />
               ) : (
                 <div
+                  data-psd-layer="background"
                   className="absolute inset-0"
                   style={{
                     background: useGradient
@@ -888,6 +983,7 @@ const handleDownloadCanvas = async () => {
               {/* Quando tem imagem de fundo, usa overlay escuro. Quando é só degradê, deixa transparente */}
               {bgImage && (
                 <div
+                  data-psd-layer="contrast-overlay"
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
@@ -902,10 +998,12 @@ const handleDownloadCanvas = async () => {
               {showBrandGlows && (
                 <>
                   <div
+                    data-psd-layer="brand-glows"
                     className="absolute -top-24 -left-24 w-80 h-80 rounded-full blur-[100px] pointer-events-none"
                     style={{ backgroundColor: brand.primaryColor, opacity: glowIntensity / 100 }}
                   />
                   <div
+                    data-psd-layer="brand-glows"
                     className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full blur-[100px] pointer-events-none"
                     style={{ backgroundColor: brand.secondaryColor, opacity: (glowIntensity / 100) * 0.6 }}
                   />
@@ -915,6 +1013,7 @@ const handleDownloadCanvas = async () => {
               {/* CAMADA 4: LOGO DO CLIENTE / MARCA - posicionado via sliders X/Y */}
               {logoImage && (
                 <div
+                  data-psd-layer="logo"
                   className={`absolute z-30 p-6 sm:p-8 ${selectedCanvasEl === 'logo' ? 'outline outline-2 outline-emerald-400 outline-offset-[-8px]' : ''}`}
                   style={{
                     left: `${logoXY?.x ?? (logoPosition.includes('left') ? 0 : logoPosition.includes('right') ? 100 : 50)}%`,
@@ -939,6 +1038,7 @@ const handleDownloadCanvas = async () => {
               {/* CAMADA 5: PESSOA REAL - com posicao livre via sliders */}
               {personImage && (
                 <div
+                  data-psd-layer="person"
                   className="absolute pointer-events-none transition-all duration-200 z-10"
                   style={{
                     bottom: `${personXY?.y ?? personBottomOffset}%`,
@@ -980,6 +1080,7 @@ const handleDownloadCanvas = async () => {
               {/* CAMADA 5.5: OVERLAY DE DEGRADÊ PARA CONTRASTE DE LEITURA */}
               {textOverlay.enabled && (
                 <div
+                  data-psd-layer="text-overlay"
                   className="absolute z-15 pointer-events-none"
                   style={{
                     ...(textOverlay.startPosition === 'top'
@@ -1020,6 +1121,7 @@ const handleDownloadCanvas = async () => {
                   {/* TOPO: BARRA SUPERIOR 100% EDITAVEL POR ELEMENTO COM POSICAO X/Y */}
                   {showTopBar && (
                     <div
+                      data-psd-layer="topbar"
                       className={`flex items-center gap-3 flex-wrap self-stretch mb-3 ${logoPosition === 'top-left' && logoImage ? 'mt-8 sm:mt-10' : ''}`}
                       style={{
                         position: tagPos ? 'absolute' : 'static',
@@ -1032,6 +1134,7 @@ const handleDownloadCanvas = async () => {
                       {/* TAG com tipografia customizada */}
                       {showTag && tag && tagConfig.visible && (
                         <span
+                          data-psd-native-text="tag"
                           className="inline-flex items-center gap-1.5 shadow-sm"
                           style={{
                             ...buildTextStyle(tagConfig),
@@ -1095,6 +1198,8 @@ const handleDownloadCanvas = async () => {
                     {/* HEADLINE PRINCIPAL */}
                     {headlineConfig.visible && headline && (
                       <h1
+                        data-psd-layer="headline"
+                        data-psd-native-text="headline"
                         style={{
                           ...buildTextStyle(headlineConfig),
                           margin: 0,
@@ -1120,6 +1225,8 @@ const handleDownloadCanvas = async () => {
                     {/* FRASE DE DESTAQUE - com posicao X/Y */}
                     {highlightConfig.visible && highlightText && (
                       <p
+                        data-psd-layer="highlight"
+                        data-psd-native-text="highlight"
                         style={{
                           ...buildTextStyle(highlightConfig),
                           margin: 0,
@@ -1149,6 +1256,8 @@ const handleDownloadCanvas = async () => {
                     {/* SUBTITULO - com posicao X/Y */}
                     {sublineConfig.visible && subline && (
                       <p
+                        data-psd-layer="subline"
+                        data-psd-native-text="subline"
                         style={{
                           ...buildTextStyle(sublineConfig),
                           margin: 0,
@@ -1179,6 +1288,7 @@ const handleDownloadCanvas = async () => {
                     {/* CTA */}
                     {showCta && ctaText && ctaConfig.visible && (
                       <div
+                        data-psd-layer="cta"
                         className="inline-flex"
                         style={{
                           position: ctaPos ? 'absolute' : 'static',
@@ -1188,6 +1298,7 @@ const handleDownloadCanvas = async () => {
                         }}
                       >
                         <span
+                          data-psd-native-text="cta"
                           className="inline-flex items-center gap-2 transition-all"
                           style={{
                             ...buildTextStyle(ctaConfig),
@@ -1220,7 +1331,7 @@ const handleDownloadCanvas = async () => {
 
             {/* BOTÕES DE AÇÃO: SALVAR + BAIXAR */}
             <div className="mt-5 space-y-2">
-              <div className="grid grid-cols-3 gap-2">
+              <div className={`grid gap-2 ${onSaveRequest ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 {onSaveRequest && (
                   <button
                     onClick={onSaveRequest}
@@ -1231,33 +1342,35 @@ const handleDownloadCanvas = async () => {
                 )}
                 <button
                   onClick={handleDownloadCanvas}
-                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl font-bold text-xs bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-lg"
+                  disabled={editMode !== 'auto' || Boolean(exportingPsd)}
+                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl font-bold text-xs bg-gradient-to-r from-brand-500 to-emerald-400 text-dark-900 hover:opacity-95 transition-all shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Download size={13} /> PNG
                 </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => {/* Toggle hint */}}
-                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl font-bold text-xs bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/30 transition-all"
-                  title="Exportar PSD com camadas separadas para edicao no Photoshop"
+                  onClick={handleExportExactPsd}
+                  disabled={editMode !== 'auto' || Boolean(exportingPsd)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-2 py-3 text-xs font-bold text-blue-200 transition-all hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="PSD com uma camada rasterizada, visualmente idêntica ao criativo final"
                 >
-                  <Layers size={13} /> PSD
+                  {exportingPsd === 'exact' ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
+                  {exportingPsd === 'exact' ? 'Gerando...' : 'PSD Exato'}
+                </button>
+                <button
+                  onClick={handleExportEditablePsd}
+                  disabled={editMode !== 'auto' || Boolean(exportingPsd)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 px-2 py-3 text-xs font-bold text-white shadow-lg transition-all hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="PSD com fundo, pessoa, logo, efeitos e textos separados em camadas"
+                >
+                  {exportingPsd === 'editable' ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
+                  {exportingPsd === 'editable' ? 'Gerando...' : 'PSD Editável'}
                 </button>
               </div>
-              <button
-                onClick={handleExportPsd}
-                disabled={exportingPsd}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:opacity-95 transition-all shadow-lg disabled:opacity-50"
-              >
-                {exportingPsd ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Gerando PSD com camadas...
-                  </>
-                ) : (
-                  <>
-                    <Layers size={16} /> Exportar PSD com Camadas (Photoshop)
-                  </>
-                )}
-              </button>
+              <p className="px-1 text-center text-[10px] leading-relaxed text-gray-500">
+                Exato preserva o visual em uma camada. Editável separa os elementos e inclui textos nativos ocultos.
+              </p>
             </div>
           </div>
         </div>
