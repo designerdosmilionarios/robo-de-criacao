@@ -3,14 +3,30 @@ export interface BrandKit {
   name: string;
   handle: string; // ex: @designer.studio
   logoUrl?: string;
-  primaryColor: string; // ex: #10b981
-  secondaryColor: string; // ex: #f59e0b
-  backgroundColor: string; // ex: #0a0b10
-  cardColor: string; // ex: #161822
-  textColor: string; // ex: #ffffff
-  accentTextColor: string; // ex: #94a3b8
-  fontHeadline: string; // ex: 'Inter', 'Montserrat', 'Syne', etc.
-  fontBody: string;
+  // Identidade
+  segment?: string; // ex: 'Moda Feminina', 'Tecnologia B2B'
+  slogan?: string; // ex: 'Transformando ideias em resultados'
+  website?: string; // ex: 'https://cliente.com.br'
+  email?: string; // ex: 'contato@cliente.com.br'
+  phone?: string; // ex: '+55 11 99999-9999'
+  // Cores principais
+  primaryColor: string; // ex: #10b981 (destaque)
+  secondaryColor: string; // ex: #f59e0b (apoio)
+  backgroundColor: string; // ex: #0a0b10 (fundo escuro)
+  cardColor: string; // ex: #161822 (cartoes)
+  textColor: string; // ex: #ffffff (texto principal)
+  accentTextColor: string; // ex: #94a3b8 (texto secundario)
+  // Cores extras
+  successColor?: string; // verde para "aprovado"
+  warningColor?: string; // amarelo para "alerta"
+  errorColor?: string; // vermelho para "erro"
+  // Fontes
+  fontHeadline: string; // titulos
+  fontBody: string; // corpo
+  // Tom de comunicacao
+  tone?: 'urgente' | 'inspirador' | 'profissional' | 'casual' | 'luxo';
+  // Tomada de decisao sobre o criativo
+  style?: 'modern' | 'minimalist' | 'bold' | 'elegant' | 'playful';
 }
 
 export interface LocalFont {
