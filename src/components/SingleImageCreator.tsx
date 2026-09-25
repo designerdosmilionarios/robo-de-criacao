@@ -999,12 +999,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                       personPosition === 'right' && textAlignment === 'left' ? 'max-w-[62%]' : 'max-w-full'
                     }`}
                     style={{
-                      position: (headlinePos || highlightPos || sublinePos || ctaPos) ? 'absolute' : 'static',
-                      left: headlinePos ? `${headlinePos.x}%` : undefined,
-                      top: headlinePos ? `${headlinePos.y}%` : undefined,
-                      transform: headlinePos ? 'translate(-50%, -50%)' : undefined,
-                      maxWidth: headlinePos ? '500px' : undefined,
-                      width: headlinePos ? '90%' : undefined,
                       gap: `${headlineConfig.lineHeight * 0.7}em`,
                       textAlign: headlineConfig.textAlign,
                       alignItems:
@@ -1021,7 +1015,12 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                         style={{
                           ...buildTextStyle(headlineConfig),
                           margin: 0,
-                          // Escala por formato
+                          position: headlinePos ? 'absolute' : 'static',
+                          left: headlinePos ? `${headlinePos.x}%` : undefined,
+                          top: headlinePos ? `${headlinePos.y}%` : undefined,
+                          transform: headlinePos ? 'translate(-50%, -50%)' : undefined,
+                          maxWidth: headlinePos ? '500px' : undefined,
+                          width: headlinePos ? '90%' : undefined,
                           fontSize: `${
                             format === '16:9'
                               ? headlineConfig.fontSize * 0.9
