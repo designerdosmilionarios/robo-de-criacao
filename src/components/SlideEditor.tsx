@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { usePersistedState } from '@/lib/usePersistedState';
 import { PosControl } from '@/components/PosControl';
+import { ToggleRow } from '@/components/ToggleRow';
 
 interface SlideEditorProps {
   slide: CarouselSlide;
@@ -666,16 +667,41 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
 
         {/* TEXTOS PERSONALIZADOS DO HEADER E FOOTER */}
         <div className="pt-3 border-t border-white/10 space-y-2">
-          <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider mb-1">
-            ✏️ Textos Editáveis do Slide
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
+              ✏️ Textos Editáveis do Slide
+            </p>
+            <button
+              onClick={() => {
+                if (confirm('Resetar todos os textos para o padrão?')) {
+                  handleChange('topBadge', '');
+                  handleChange('bottomLeft', '');
+                  handleChange('bottomRight', '');
+                }
+              }}
+              className="text-[9px] text-gray-500 hover:text-red-400"
+            >
+              Limpar tudo
+            </button>
+          </div>
 
-          {/* Top Badge (apenas slide cover) */}
-          {slide.type === 'cover' && (
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-                Badge Superior (ex: 🔥 NOVO, 🚀 LANÇAMENTO)
+          {/* Toggle: Top Badge */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-gray-400">
+                Badge Superior
+                {slide.type === 'cover' && <span className="ml-1 text-[9px] text-amber-400">(só cover)</span>}
               </label>
+              {slide.topBadge && (
+                <button
+                  onClick={() => handleChange('topBadge', '')}
+                  className="text-[10px] text-red-400 hover:underline"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            {slide.topBadge !== '' || slide.type !== 'cover' ? (
               <input
                 type="text"
                 value={slide.topBadge || ''}
@@ -683,35 +709,76 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
                 placeholder="🔥 Post Novo"
                 className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
               />
-            </div>
-          )}
-
-          {/* Bottom Left */}
-          <div>
-            <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-              Texto Inferior Esquerdo (CTA do carrossel)
-            </label>
-            <input
-              type="text"
-              value={slide.bottomLeft || ''}
-              onChange={(e) => handleChange('bottomLeft', e.target.value)}
-              placeholder="DESLIZE PARA VER O PASSO A PASSO →"
-              className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
-            />
+            ) : (
+              <button
+                onClick={() => handleChange('topBadge', '🔥 Post Novo')}
+                className="w-full text-[11px] text-emerald-400 border border-dashed border-emerald-500/30 rounded-md py-1.5 hover:bg-emerald-500/10"
+              >
+                + Adicionar badge
+              </button>
+            )}
           </div>
 
-          {/* Bottom Right */}
+          {/* Toggle: Bottom Left */}
           <div>
-            <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-              Texto Inferior Direito (Call to Action)
-            </label>
-            <input
-              type="text"
-              value={slide.bottomRight || ''}
-              onChange={(e) => handleChange('bottomRight', e.target.value)}
-              placeholder="📌 Salvar post"
-              className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-gray-400">Texto Inferior Esquerdo</label>
+              {slide.bottomLeft && (
+                <button
+                  onClick={() => handleChange('bottomLeft', '')}
+                  className="text-[10px] text-red-400 hover:underline"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            {slide.bottomLeft !== '' ? (
+              <input
+                type="text"
+                value={slide.bottomLeft || ''}
+                onChange={(e) => handleChange('bottomLeft', e.target.value)}
+                placeholder="DESLIZE PARA VER O PASSO A PASSO →"
+                className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => handleChange('bottomLeft', 'Arraste para o lado ➔')}
+                className="w-full text-[11px] text-emerald-400 border border-dashed border-emerald-500/30 rounded-md py-1.5 hover:bg-emerald-500/10"
+              >
+                + Adicionar texto
+              </button>
+            )}
+          </div>
+
+          {/* Toggle: Bottom Right */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-gray-400">Texto Inferior Direito</label>
+              {slide.bottomRight && (
+                <button
+                  onClick={() => handleChange('bottomRight', '')}
+                  className="text-[10px] text-red-400 hover:underline"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            {slide.bottomRight !== '' ? (
+              <input
+                type="text"
+                value={slide.bottomRight || ''}
+                onChange={(e) => handleChange('bottomRight', e.target.value)}
+                placeholder="📌 Salvar post"
+                className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => handleChange('bottomRight', 'Salvar post')}
+                className="w-full text-[11px] text-emerald-400 border border-dashed border-emerald-500/30 rounded-md py-1.5 hover:bg-emerald-500/10"
+              >
+                + Adicionar texto
+              </button>
+            )}
           </div>
 
           {/* Sliders de posição livre para textos */}
@@ -720,22 +787,44 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
           </p>
 
           {/* Tag position */}
-          {slide.tag && (
-            <PosControl label="Tag" pos={slide.tagPos} onChange={(p) => handleChange('tagPos', p)} />
+          {slide.tag !== '' && (
+            <PosControl
+              label="Tag"
+              pos={slide.tagPos}
+              onChange={(p) => handleChange('tagPos', p)}
+            />
           )}
           {/* Title position */}
-          <PosControl label="Título" pos={slide.titlePos} onChange={(p) => handleChange('titlePos', p)} />
+          {slide.title !== '' && (
+            <PosControl
+              label="Título"
+              pos={slide.titlePos}
+              onChange={(p) => handleChange('titlePos', p)}
+            />
+          )}
           {/* Highlight position */}
-          {slide.highlightText && (
-            <PosControl label="Destaque" pos={slide.highlightPos} onChange={(p) => handleChange('highlightPos', p)} />
+          {slide.highlightText && slide.highlightText !== '' && (
+            <PosControl
+              label="Destaque"
+              pos={slide.highlightPos}
+              onChange={(p) => handleChange('highlightPos', p)}
+            />
           )}
           {/* Subtitle position */}
-          {slide.subtitle && (
-            <PosControl label="Subtítulo" pos={slide.subtitlePos} onChange={(p) => handleChange('subtitlePos', p)} />
+          {slide.subtitle && slide.subtitle !== '' && (
+            <PosControl
+              label="Subtítulo"
+              pos={slide.subtitlePos}
+              onChange={(p) => handleChange('subtitlePos', p)}
+            />
           )}
           {/* CTA position */}
           {slide.ctaButton && (
-            <PosControl label="CTA" pos={slide.ctaPos} onChange={(p) => handleChange('ctaPos', p)} />
+            <PosControl
+              label="CTA"
+              pos={slide.ctaPos}
+              onChange={(p) => handleChange('ctaPos', p)}
+            />
           )}
           {/* BodyList position */}
           {slide.bodyList && slide.bodyList.length > 0 && (
@@ -745,6 +834,73 @@ export const SlideEditor: React.FC<SlideEditorProps> = ({
               onChange={(p) => handleChange('bodyListPos', p)}
             />
           )}
+
+          {/* Acoes globais */}
+          <div className="pt-2 border-t border-white/5 space-y-1.5">
+            <p className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+              🎛️ Visibilidade do Slide
+            </p>
+            <ToggleRow
+              label="Mostrar Imagem de Fundo"
+              active={!!slide.imageUrl}
+              onChange={(v) => { if (!v) handleChange('imageUrl', undefined); }}
+            />
+            <ToggleRow
+              label="Mostrar Tag Superior"
+              active={!!(slide.tag && slide.tag.length > 0)}
+              onChange={(v) => handleChange('tag', v ? (slide.tag || 'MÉTODO EXCLUSIVO') : '')}
+            />
+            <ToggleRow
+              label="Mostrar Destaque"
+              active={!!(slide.highlightText && slide.highlightText.length > 0)}
+              onChange={(v) => handleChange('highlightText', v ? (slide.highlightText || 'Sem gastar mais em tráfego') : '')}
+            />
+            <ToggleRow
+              label="Mostrar Subtítulo"
+              active={!!(slide.subtitle && slide.subtitle.length > 0)}
+              onChange={(v) => handleChange('subtitle', v ? (slide.subtitle || 'Texto de exemplo...') : '')}
+            />
+            <ToggleRow
+              label="Mostrar Lista de Bullets"
+              active={!!(slide.bodyList && slide.bodyList.length > 0)}
+              onChange={(v) =>
+                handleChange(
+                  'bodyList',
+                  v
+                    ? (slide.bodyList && slide.bodyList.length > 0
+                        ? slide.bodyList
+                        : ['Primeiro ponto', 'Segundo ponto', 'Terceiro ponto'])
+                    : []
+                )
+              }
+            />
+            <ToggleRow
+              label="Mostrar Botão CTA"
+              active={!!(slide.ctaButton && slide.ctaButton.length > 0)}
+              onChange={(v) => handleChange('ctaButton', v ? (slide.ctaButton || 'QUERO APRENDER AGORA') : '')}
+            />
+            <ToggleRow
+              label="Mostrar Header (marca + slide #)"
+              active={true}
+              disabled
+            />
+            <ToggleRow
+              label="Mostrar Footer (textos editáveis)"
+              active={
+                !!(slide.bottomLeft || slide.bottomRight) ||
+                !!slide.badge
+              }
+              onChange={(v) => {
+                if (!v) {
+                  handleChange('bottomLeft', '');
+                  handleChange('bottomRight', '');
+                } else {
+                  handleChange('bottomLeft', 'Arraste para o lado ➔');
+                  handleChange('bottomRight', 'Salvar post');
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
 
