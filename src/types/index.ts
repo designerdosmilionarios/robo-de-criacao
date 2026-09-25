@@ -238,3 +238,23 @@ export interface SavedBatchAdsData {
     imageUrl?: string;
   }>;
 }
+
+// =========================================
+// Autenticação e Sessão de Usuário
+// =========================================
+export interface AuthUser {
+  name: string;
+  email: string;
+  pin: string;
+  role?: string;
+  createdAt: string;
+}
+
+export interface AuthSession {
+  isLoggedIn: boolean;
+  user: {
+    name: string;
+    email: string;
+  } | null;
+  loggedInAt?: string;
+}

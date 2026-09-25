@@ -15,6 +15,9 @@ import { FontManager, LocalFont as FontManagerLocalFont } from '@/components/Fon
 import { MyProjects } from '@/components/MyProjects';
 import { SaveProjectModal } from '@/components/SaveProjectModal';
 import { FlowCanvas } from '@/components/FlowCanvas';
+import { ApiKeyGuide } from '@/components/ApiKeyGuide';
+import { AuthScreen } from '@/components/AuthScreen';
+import { useAuth } from '@/lib/useAuth';
 import { useProjects } from '@/lib/useProjects';
 import { useLocalFonts } from '@/lib/useLocalFonts';
 import {
@@ -35,15 +38,30 @@ import {
   Save,
   CheckCircle2,
   GitBranch,
+  BookOpen,
+  LogOut,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import saveAs from 'file-saver';
 
 type AIProvider = 'openai';
-type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects' | 'flow';
+type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects' | 'flow' | 'api-guide';
 
 export default function Home() {
+  // Autenticação e Sessão
+  const {
+    isLoaded: authLoaded,
+    hasRegisteredUser,
+    currentUser,
+    isAuthenticated,
+    sessionUser,
+    register: registerAuth,
+    login: loginAuth,
+    logout: logoutAuth,
+    resetAccount: resetAuthAccount,
+  } = useAuth();
+
   const [brands, setBrands] = useState<BrandKit[]>(DEFAULT_BRANDS);
   const [activeBrandId, setActiveBrandId] = useState<string>(DEFAULT_BRANDS[0].id);
   const [brandsLoaded, setBrandsLoaded] = useState(false);
@@ -462,6 +480,33 @@ export default function Home() {
   const apiKey = openaiApiKey;
   const hasApiKey = !!apiKey;
 
+  // Enquanto carrega a autenticação do localStorage, exibe tela de carregamento suave
+  if (!authLoaded) {
+    return (
+      <div className="min-h-screen bg-[#07090e] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center text-dark-900 shadow-xl shadow-brand-500/20 animate-pulse">
+            <Sparkles size={24} />
+          </div>
+          <span className="text-xs font-mono text-gray-500">Iniciando Robô Studio...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não estiver autenticado, exibe a tela de login/primeiro acesso
+  if (!isAuthenticated) {
+    return (
+      <AuthScreen
+        hasRegisteredUser={hasRegisteredUser}
+        currentUser={currentUser}
+        onLogin={loginAuth}
+        onRegister={registerAuth}
+        onResetAccount={resetAuthAccount}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen pb-16">
       {/* NAVBAR SUPERIOR */}
@@ -545,10 +590,20 @@ export default function Home() {
             >
               <Type size={13} /> Fontes ({localFonts.length})
             </button>
+            <button
+              onClick={() => setActiveTab('api-guide')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'api-guide'
+                  ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-dark-900 shadow-md'
+                  : 'text-amber-400/90 hover:text-amber-300'
+              }`}
+            >
+              <BookOpen size={13} /> Guia API Key
+            </button>
             </div>
           </div>
 
-          {/* SELETOR DE CLIENTE + API */}
+          {/* SELETOR DE CLIENTE + API + PERFIL */}
           <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 2xl:col-start-3">
             {/* Removido: Provider Switcher (só OpenAI agora) */}
 
@@ -572,6 +627,23 @@ export default function Home() {
               <Key size={14} className={hasApiKey ? 'text-emerald-400' : 'text-amber-400'} />
               <span className="hidden sm:inline">{hasApiKey ? 'Conectada' : 'API'}</span>
             </button>
+
+            {/* Perfil do Usuário e Logout */}
+            <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10">
+              <div
+                className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-500/20 to-emerald-400/20 border border-brand-500/30 flex items-center justify-center text-xs font-bold text-brand-300"
+                title={sessionUser ? `${sessionUser.name} (${sessionUser.email})` : 'Usuário Conectado'}
+              >
+                {sessionUser?.name ? sessionUser.name.slice(0, 2).toUpperCase() : 'US'}
+              </div>
+              <button
+                onClick={logoutAuth}
+                className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/10 hover:border-rose-500/30 border border-white/10 text-gray-400 hover:text-rose-400 transition-all"
+                title="Bloquear / Sair da Sessão"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -808,6 +880,17 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {activeTab === 'api-guide' && (
+          <ApiKeyGuide
+            apiKey={openaiApiKey}
+            onSaveApiKey={(newKey) => {
+              setOpenaiApiKey(newKey);
+              localStorage.setItem('openai_api_key', newKey);
+            }}
+            onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+          />
+        )}
       </div>
 
       {/* MODAIS */}
@@ -854,6 +937,7 @@ export default function Home() {
           setOpenaiApiKey(key);
           localStorage.setItem('openai_api_key', key);
         }}
+        onOpenGuide={() => setActiveTab('api-guide')}
       />
 
       <FontManager

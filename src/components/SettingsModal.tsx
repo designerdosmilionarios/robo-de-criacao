@@ -8,6 +8,7 @@ interface SettingsModalProps {
   claudeApiKey?: string;
   provider?: 'openai';
   onSaveApiKey: (key: string) => void;
+  onOpenGuide?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -15,6 +16,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   openaiApiKey,
   onSaveApiKey,
+  onOpenGuide,
 }) => {
   const [keyInput, setKeyInput] = useState(openaiApiKey);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -93,6 +95,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[11px] text-gray-500 mt-2">
               Use a chave da plataforma OpenAI. A ferramenta prioriza GPT Image 2.5 Sunburst, Flare e GPT Image 2.
             </p>
+            {onOpenGuide && (
+              <div className="mt-3 p-3 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-between">
+                <span className="text-xs text-brand-300 font-medium">
+                  Não sabe como criar ou colocar créditos na chave?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenGuide();
+                  }}
+                  className="text-xs font-bold text-brand-400 hover:text-brand-300 hover:underline inline-flex items-center gap-1"
+                >
+                  Abrir Guia Passo a Passo →
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
