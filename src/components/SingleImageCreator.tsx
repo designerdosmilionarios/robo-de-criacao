@@ -1245,6 +1245,25 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             </div>
           </div>
 
+          {/* SEÇÃO POSIÇÃO INDIVIDUAL DOS TEXTOS (X/Y) - SEMPRE VISÍVEL */}
+          <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                Posição Individual dos Textos
+              </h3>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-300">HEADLINE</span>
+                  <button onClick={() => setHeadlinePos(null)} className="text-[9px] text-gray-400">Reset</button>
+                </div>
+                <input type="range" min="0" max="100" value={headlinePos?.x ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: Number(e.target.value), y: p?.y ?? 50 }))} className="w-full accent-emerald-500" />
+                <input type="range" min="0" max="100" value={headlinePos?.y ?? 50} onChange={(e) => setHeadlinePos((p) => ({ x: p?.x ?? 50, y: Number(e.target.value) }))} className="w-full accent-emerald-500" />
+              </div>
+            </div>
+          </div>
+
           {/* SEÇÃO 1: LOGO DO CLIENTE */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
