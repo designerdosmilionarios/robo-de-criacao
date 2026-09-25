@@ -1157,8 +1157,8 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           </div>
         </div>
 
-        {/* COLUNA DIREITA: PAINEL DE EDIÇÃO (4 COLS - sticky para acompanhar scroll longo) */}
-        <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:pr-2">
+        {/* COLUNA DIREITA: PAINEL DE EDIÇÃO (4 COLS) */}
+        <div className="xl:col-span-4 space-y-4 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto xl:pr-2">
           {/* SEÇÃO INDEPENDENTE: POSIÇÃO INDIVIDUAL DOS TEXTOS (X/Y) */}
           <div className="p-5 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
