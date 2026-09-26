@@ -159,10 +159,11 @@ function enhancePrompt(rawPrompt: string): string {
   const core = base.length > 4 ? base.replace(/\.+$/, '').trim() : 'premium dark cinematic background for advertising';
   return [
     core,
-    'Single unified cinematic scene, professional commercial advertising background, editorial photography, magazine quality, ultra-detailed, 8k, Canon EOS R5 35mm f/1.4, cinematic color grading, dramatic rim lighting, deep depth of field',
+    'Single unified scene created for a premium advertising campaign. Make the subject, environment and visual metaphor directly relevant to the specific offer and audience described. Editorial art direction, intentional lighting, believable materials, natural skin texture when people are present, sophisticated color grading and strong focal hierarchy',
     'IMPORTANT: Generate ONE single unified image. NOT side-by-side comparison. NOT before/after. NOT split screen. NOT multiple panels.',
-    'Avoid in the image: unintended text, words, letters, numbers, watermarks, signatures, unrequested logos, ugly artifacts, plastic skin, oversaturated colors, blurry, distorted anatomy, extra fingers',
-    'Composition: leave clean empty space on the right or left side for text overlay to be added later',
+    'Do not fall back to generic marketing imagery. Do not show smartphones, dashboards, charts, social media icons, handshakes, light bulbs or random office scenes unless the brief explicitly asks for them.',
+    'Avoid in the image: unintended text, words, letters, numbers, watermarks, signatures, unrequested logos, busy backgrounds, stock-photo clichés, ugly artifacts, plastic skin, oversaturated colors, blur, distorted anatomy, extra fingers.',
+    'Respect the exact negative-space and subject-placement instructions in the prompt because typography will be overlaid later. Keep the reserved text area calm, low-detail and high-contrast.',
   ].filter(Boolean).join('. ');
 }
 

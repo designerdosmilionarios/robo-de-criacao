@@ -64,6 +64,84 @@ interface FlowCanvasProps {
   };
 }
 
+type CreativeLayout = 'editorial-left' | 'editorial-right' | 'bottom-card';
+type TextPositions = {
+  headline: { x: number; y: number };
+  support: { x: number; y: number };
+  cta: { x: number; y: number };
+};
+
+const CREATIVE_LAYOUTS: Record<CreativeLayout, {
+  label: string;
+  hint: string;
+  positions: TextPositions;
+  textWidth: number;
+  align: 'left' | 'right';
+  gradient: string;
+  promptDirection: string;
+}> = {
+  'editorial-left': {
+    label: 'Editorial esquerda',
+    hint: 'Texto à esquerda, assunto à direita',
+    positions: { headline: { x: 8, y: 18 }, support: { x: 8, y: 62 }, cta: { x: 8, y: 80 } },
+    textWidth: 56,
+    align: 'left',
+    gradient: 'linear-gradient(90deg, rgba(5,7,12,.88) 0%, rgba(5,7,12,.58) 44%, rgba(5,7,12,.06) 76%)',
+    promptDirection: 'Place the main subject on the RIGHT third. Reserve the LEFT 48% as calm negative space with darker, low-detail tones for typography.',
+  },
+  'editorial-right': {
+    label: 'Editorial direita',
+    hint: 'Texto à direita, assunto à esquerda',
+    positions: { headline: { x: 48, y: 18 }, support: { x: 48, y: 62 }, cta: { x: 48, y: 80 } },
+    textWidth: 44,
+    align: 'left',
+    gradient: 'linear-gradient(270deg, rgba(5,7,12,.88) 0%, rgba(5,7,12,.58) 44%, rgba(5,7,12,.04) 76%)',
+    promptDirection: 'Place the main subject on the LEFT third. Reserve the RIGHT 44% as calm negative space with darker, low-detail tones for typography.',
+  },
+  'bottom-card': {
+    label: 'Editorial inferior',
+    hint: 'Imagem protagonista, texto na base',
+    positions: { headline: { x: 8, y: 54 }, support: { x: 8, y: 72 }, cta: { x: 8, y: 84 } },
+    textWidth: 78,
+    align: 'left',
+    gradient: 'linear-gradient(0deg, rgba(5,7,12,.94) 0%, rgba(5,7,12,.7) 38%, rgba(5,7,12,0) 72%)',
+    promptDirection: 'Keep the main subject in the UPPER half. Reserve the LOWER 42% as calm, darker negative space for typography.',
+  },
+};
+
+const cleanCopyField = (value: unknown) => {
+  const text = String(value || '').trim();
+  return /^\(?sem\s+(?:cta|texto|destaque)\)?$/i.test(text) ? '' : text;
+};
+
+const getAdaptiveHeadlineSize = (text: string, configuredSize: number, multiple: boolean) => {
+  const length = text.trim().length;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const safeMaximum = multiple ? 38 : 58;
+  const contentMaximum = length > 58 || words > 9 ? 30 : length > 42 || words > 7 ? 34 : length > 28 ? 40 : safeMaximum;
+  return Math.min(configuredSize, contentMaximum);
+};
+
+function buildCreativeImagePrompt(
+  visualBrief: string,
+  copy: { headline?: string; support?: string; cta?: string } | null,
+  layout: CreativeLayout
+) {
+  const headline = cleanCopyField(copy?.headline);
+  const support = cleanCopyField(copy?.support);
+  const message = [headline, support].filter(Boolean).join(' — ');
+  const layoutDirection = CREATIVE_LAYOUTS[layout].promptDirection;
+
+  return [
+    visualBrief,
+    message ? `Campaign message and strategic meaning to visualize: "${message}".` : '',
+    'Translate the offer into a specific, believable visual scene tied directly to the audience, problem and desired outcome. Prefer a human situation, product detail, environment or distinctive visual metaphor that could only belong to this brief.',
+    layoutDirection,
+    'The reserved typography area must contain no faces, hands, products, important objects or bright highlights.',
+    'Create only the photographic or illustrated background. Do not render the campaign headline, CTA, typography, labels, interface screens, logos or any readable text inside the image.',
+  ].filter(Boolean).join(' ');
+}
+
 // Configuracao visual dos tipos de bloco
 const BLOCK_CONFIG: Record<BlockType, {
   icon: any;
@@ -166,41 +244,44 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
+  const [creativeLayout, setCreativeLayout] = useState<CreativeLayout>('editorial-left');
 
   // Posicionamento dos textos no preview (X/Y em %)
-  type TextPositions = { headline: { x: number; y: number }; support: { x: number; y: number }; cta: { x: number; y: number } };
-  const [textPositions, setTextPositions] = useState<TextPositions>(() => {
-    if (typeof window === 'undefined') {
-      return {
-        headline: { x: 8, y: 15 },
-        support: { x: 8, y: 75 },
-        cta: { x: 8, y: 90 },
-      };
-    }
+  const [textPositions, setTextPositions] = useState<TextPositions>(
+    CREATIVE_LAYOUTS['editorial-left'].positions
+  );
+
+  useEffect(() => {
     try {
+      const savedLayout = localStorage.getItem('flow_creative_layout') as CreativeLayout | null;
       const saved = localStorage.getItem('flow_text_positions');
-      if (saved) return JSON.parse(saved);
+      if (savedLayout && CREATIVE_LAYOUTS[savedLayout]) setCreativeLayout(savedLayout);
+      if (saved) {
+        const parsed = JSON.parse(saved) as TextPositions;
+        setTextPositions({
+          headline: { x: Math.min(Math.max(parsed.headline?.x ?? 8, 4), 82), y: Math.min(Math.max(parsed.headline?.y ?? 18, 6), 68) },
+          support: { x: Math.min(Math.max(parsed.support?.x ?? 8, 4), 82), y: Math.min(Math.max(parsed.support?.y ?? 62, 35), 80) },
+          cta: { x: Math.min(Math.max(parsed.cta?.x ?? 8, 4), 78), y: Math.min(Math.max(parsed.cta?.y ?? 80, 55), 88) },
+        });
+      }
     } catch {}
-    return {
-      headline: { x: 8, y: 15 },
-      support: { x: 8, y: 75 },
-      cta: { x: 8, y: 90 },
-    };
-  });
+  }, []);
 
   // Persistir posições de texto automaticamente
   useEffect(() => {
     try {
       localStorage.setItem('flow_text_positions', JSON.stringify(textPositions));
+      localStorage.setItem('flow_creative_layout', creativeLayout);
     } catch {}
-  }, [textPositions]);
+  }, [textPositions, creativeLayout]);
+
+  const applyCreativeLayout = (layout: CreativeLayout) => {
+    setCreativeLayout(layout);
+    setTextPositions(CREATIVE_LAYOUTS[layout].positions);
+  };
 
   const resetTextPositions = () => {
-    setTextPositions({
-      headline: { x: 8, y: 15 },
-      support: { x: 8, y: 75 },
-      cta: { x: 8, y: 90 },
-    });
+    setTextPositions(CREATIVE_LAYOUTS[creativeLayout].positions);
   };
 
   // Posicao do logo (X/Y em %) e tamanho (% da largura)
@@ -675,7 +756,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             throw new Error(`Slot ${i + 1} sem briefing nem prompt visual. Preencha o campo "Prompt Visual" do bloco Gerar Imagem ou conecte um bloco Briefing.`);
           }
 
-          const url = await generateImage(effectiveBriefing, style, logo, apiKey, references, expertImage, expertPreserve);
+          const directedVisualPrompt = buildCreativeImagePrompt(
+            effectiveBriefing,
+            copyForThis,
+            creativeLayout
+          );
+          const url = await generateImage(directedVisualPrompt, style, logo, apiKey, references, expertImage, expertPreserve);
           if (url) {
             items.push(copyForThis ? { imageUrl: url, copy: copyForThis } : { imageUrl: url });
           }
@@ -844,32 +930,44 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           <p className="text-[9px] text-gray-500">Edite aqui ou gere uma copy para preencher.</p>
         </div>
         <label className="space-y-1">
-          <span className="block text-[9px] font-bold uppercase text-gray-500">Headline</span>
+          <span className="flex justify-between text-[9px] font-bold uppercase text-gray-500">
+            <span>Headline · 4–7 palavras</span>
+            <span className={creativeText.headline.length > 42 ? 'text-rose-400' : ''}>{creativeText.headline.length}/42</span>
+          </span>
           <input
             aria-label="Headline do criativo"
             value={creativeText.headline}
             onChange={(event) => setCreativeText((current) => ({ ...current, headline: event.target.value }))}
             placeholder="Título principal"
+            maxLength={60}
             className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none focus:border-emerald-400"
           />
         </label>
         <label className="space-y-1">
-          <span className="block text-[9px] font-bold uppercase text-gray-500">Destaque</span>
+          <span className="flex justify-between text-[9px] font-bold uppercase text-gray-500">
+            <span>Apoio · até 12 palavras</span>
+            <span className={creativeText.support.length > 78 ? 'text-rose-400' : ''}>{creativeText.support.length}/78</span>
+          </span>
           <input
             aria-label="Destaque do criativo"
             value={creativeText.support}
             onChange={(event) => setCreativeText((current) => ({ ...current, support: event.target.value }))}
             placeholder="Complemento da mensagem"
+            maxLength={100}
             className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none focus:border-emerald-400"
           />
         </label>
         <label className="space-y-1">
-          <span className="block text-[9px] font-bold uppercase text-gray-500">CTA</span>
+          <span className="flex justify-between text-[9px] font-bold uppercase text-gray-500">
+            <span>CTA · verbo de ação</span>
+            <span className={creativeText.cta.length > 24 ? 'text-rose-400' : ''}>{creativeText.cta.length}/24</span>
+          </span>
           <input
             aria-label="CTA do criativo"
             value={creativeText.cta}
             onChange={(event) => setCreativeText((current) => ({ ...current, cta: event.target.value }))}
             placeholder="Saiba mais"
+            maxLength={32}
             className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-white outline-none focus:border-emerald-400"
           />
         </label>
@@ -1945,19 +2043,43 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               </div>
             </div>
 
-            {/* SLIDERS DE POSICAO DOS TEXTOS (X/Y %) */}
+            {/* DIRECAO DE LAYOUT + AJUSTES FINOS */}
             <div className="mb-5 p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  📐 Posição dos Textos (X / Y %)
+                  ✦ Composição editorial
                 </h4>
                 <button
                   onClick={resetTextPositions}
                   className="text-[10px] text-gray-400 hover:text-white px-2 py-1 rounded border border-white/10 hover:border-white/30"
                 >
-                  Resetar
+                  Restaurar layout
                 </button>
               </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {(Object.keys(CREATIVE_LAYOUTS) as CreativeLayout[]).map((layoutKey) => {
+                  const option = CREATIVE_LAYOUTS[layoutKey];
+                  const active = creativeLayout === layoutKey;
+                  return (
+                    <button
+                      key={layoutKey}
+                      type="button"
+                      onClick={() => applyCreativeLayout(layoutKey)}
+                      className={`rounded-xl border p-3 text-left transition-all ${
+                        active
+                          ? 'border-emerald-400/60 bg-emerald-400/10 text-white'
+                          : 'border-white/10 bg-black/20 text-gray-400 hover:border-white/25 hover:text-white'
+                      }`}
+                    >
+                      <span className="block text-[11px] font-extrabold">{option.label}</span>
+                      <span className="mt-0.5 block text-[9px] opacity-70">{option.hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] leading-relaxed text-gray-500">
+                O layout também orienta a IA a reservar uma área limpa na imagem. Use os controles abaixo apenas para ajustes finos.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {(['headline', 'support', 'cta'] as const).map((key) => (
                   <div key={key} className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-1.5">
@@ -1971,8 +2093,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     </div>
                     <input
                       type="range"
-                      min="0"
-                      max="100"
+                      min="4"
+                      max={key === 'cta' ? 78 : 82}
                       value={textPositions[key].x}
                       onChange={(e) =>
                         setTextPositions((prev: TextPositions) => ({
@@ -1985,8 +2107,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     />
                     <input
                       type="range"
-                      min="0"
-                      max="100"
+                      min={key === 'headline' ? 6 : key === 'support' ? 35 : 55}
+                      max={key === 'headline' ? 68 : key === 'support' ? 80 : 88}
                       value={textPositions[key].y}
                       onChange={(e) =>
                         setTextPositions((prev: TextPositions) => ({
@@ -2067,15 +2189,21 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             )}
 
             {Array.isArray(outputModal.output) ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className={outputModal.output.length === 1 ? 'mx-auto max-w-[620px]' : 'grid grid-cols-1 gap-4 lg:grid-cols-2'}>
                 {outputModal.output.map((out: any, i: number) => {
                   // Suporte ao novo formato { imageUrl, copy } OU string legado
                   const imageUrl: string | null =
                     typeof out === 'string' ? out : out?.imageUrl || null;
                   const pairedCopy = typeof out === 'object' ? out?.copy : null;
-                  const headlineToShow = pairedCopy?.headline || creativeText.headline;
-                  const supportToShow = pairedCopy?.support || creativeText.support;
-                  const ctaToShow = pairedCopy?.cta || creativeText.cta;
+                  const headlineToShow = cleanCopyField(pairedCopy?.headline || creativeText.headline);
+                  const supportToShow = cleanCopyField(pairedCopy?.support || creativeText.support);
+                  const ctaToShow = cleanCopyField(pairedCopy?.cta || creativeText.cta);
+                  const layoutConfig = CREATIVE_LAYOUTS[creativeLayout];
+                  const headlineSize = getAdaptiveHeadlineSize(
+                    headlineToShow,
+                    typographyForModal?.headline?.size || 36,
+                    outputModal.output.length > 1
+                  );
 
                   return (
                     <div key={i} className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
@@ -2083,6 +2211,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                         <>
                           <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
                             <img src={imageUrl} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
+                            <div
+                              className="absolute inset-0 pointer-events-none"
+                              style={{ background: layoutConfig.gradient }}
+                            />
                             {logoUrlForModal && (
                               <img
                                 src={logoUrlForModal}
@@ -2100,14 +2232,20 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             )}
                             {headlineToShow && (
                               <h4
-                                className="absolute uppercase leading-[0.95] drop-shadow-lg max-w-[85%]"
+                                className="absolute uppercase leading-[0.98] tracking-[-0.035em]"
                                 style={{
                                   left: `${textPositions.headline.x}%`,
                                   top: `${textPositions.headline.y}%`,
+                                  width: `${layoutConfig.textWidth}%`,
+                                  maxWidth: `${layoutConfig.textWidth}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.headline?.weight || 800,
-                                  fontSize: `${typographyForModal?.headline?.size || 36}px`,
+                                  fontSize: `${headlineSize}px`,
                                   color: typographyForModal?.headline?.color || '#ffffff',
+                                  textAlign: layoutConfig.align,
+                                  textWrap: 'balance',
+                                  overflowWrap: 'normal',
+                                  textShadow: '0 2px 18px rgba(0,0,0,.55)',
                                 }}
                               >
                                 {renderHeadlineWithHighlight(headlineToShow, typographyForModal?.highlight)}
@@ -2115,14 +2253,19 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             )}
                             {supportToShow && (
                               <p
-                                className="absolute max-w-[85%] leading-tight drop-shadow"
+                                className="absolute leading-[1.25]"
                                 style={{
                                   left: `${textPositions.support.x}%`,
                                   top: `${textPositions.support.y}%`,
+                                  width: `${layoutConfig.textWidth}%`,
+                                  maxWidth: `${layoutConfig.textWidth}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.support?.weight || 400,
-                                  fontSize: `${typographyForModal?.support?.size || 16}px`,
+                                  fontSize: `${Math.min(typographyForModal?.support?.size || 16, 18)}px`,
                                   color: typographyForModal?.support?.color || '#f5f5f5',
+                                  textAlign: layoutConfig.align,
+                                  textWrap: 'balance',
+                                  textShadow: '0 2px 12px rgba(0,0,0,.7)',
                                 }}
                               >
                                 {supportToShow}
@@ -2130,7 +2273,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             )}
                             {ctaToShow && (
                               <span
-                                className="absolute inline-flex rounded-lg px-3 py-2 uppercase shadow-lg"
+                                className="absolute inline-flex min-h-10 items-center rounded-full px-4 py-2 uppercase tracking-[0.04em] shadow-lg"
                                 style={{
                                   left: `${textPositions.cta.x}%`,
                                   top: `${textPositions.cta.y}%`,
@@ -2139,6 +2282,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   fontSize: `${typographyForModal?.cta?.size || 14}px`,
                                   color: typographyForModal?.cta?.color || '#0a0b10',
                                   backgroundColor: typographyForModal?.cta?.bgColor || '#10b981',
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
                                 {ctaToShow}
