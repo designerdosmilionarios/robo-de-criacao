@@ -17,15 +17,19 @@ import {
   Check,
   Zap,
   Hash,
+  User,
+  Archive,
 } from 'lucide-react';
 import { optimizeImageDataUrl } from '@/lib/imageData';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
+import JSZip from 'jszip';
 
 // Tipos de blocos disponiveis no canvas
 export type BlockType =
   | 'briefing'
   | 'logo'
+  | 'expert'
   | 'reference'
   | 'style'
   | 'copy-output'
@@ -79,6 +83,13 @@ const BLOCK_CONFIG: Record<BlockType, {
     bgColor: 'bg-purple-500/5',
     description: 'Logo / imagem de referência',
   },
+  expert: {
+    icon: User,
+    color: 'text-rose-400',
+    borderColor: 'border-rose-500/40 hover:border-rose-500',
+    bgColor: 'bg-rose-500/5',
+    description: 'Foto do Expert / Apresentador',
+  },
   reference: {
     icon: ImageIcon,
     color: 'text-fuchsia-400',
@@ -126,8 +137,45 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
   const [creativeText, setCreativeText] = useState({ headline: '', support: '', cta: '' });
   const [downloadingPreview, setDownloadingPreview] = useState<number | null>(null);
+  const [downloadingZip, setDownloadingZip] = useState(false);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
+
+  // Posicionamento dos textos no preview (X/Y em %)
+  type TextPositions = { headline: { x: number; y: number }; support: { x: number; y: number }; cta: { x: number; y: number } };
+  const [textPositions, setTextPositions] = useState<TextPositions>(() => {
+    if (typeof window === 'undefined') {
+      return {
+        headline: { x: 8, y: 70 },
+        support: { x: 8, y: 82 },
+        cta: { x: 8, y: 92 },
+      };
+    }
+    try {
+      const saved = localStorage.getItem('flow_text_positions');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      headline: { x: 8, y: 70 },
+      support: { x: 8, y: 82 },
+      cta: { x: 8, y: 92 },
+    };
+  });
+
+  // Persistir posições de texto automaticamente
+  useEffect(() => {
+    try {
+      localStorage.setItem('flow_text_positions', JSON.stringify(textPositions));
+    } catch {}
+  }, [textPositions]);
+
+  const resetTextPositions = () => {
+    setTextPositions({
+      headline: { x: 8, y: 70 },
+      support: { x: 8, y: 82 },
+      cta: { x: 8, y: 92 },
+    });
+  };
   const canvasRef = useRef<HTMLDivElement>(null);
   const referencesInputRef = useRef<HTMLInputElement>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -299,6 +347,41 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     }
   };
 
+  // Download em lote (ZIP) de todos os criativos do modal
+  const handleDownloadZip = async () => {
+    if (!outputModal || !Array.isArray(outputModal.output)) return;
+    const images: string[] = outputModal.output.filter(
+      (v: any) => typeof v === 'string' && v.startsWith('data:image')
+    );
+    if (images.length === 0) {
+      alert('Nenhuma imagem disponível para empacotar em ZIP.');
+      return;
+    }
+
+    setDownloadingZip(true);
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < images.length; i++) {
+        const preview = document.getElementById(`flow-creative-preview-${i}`);
+        if (!preview) continue;
+        const dataUrl = await toPng(preview, {
+          pixelRatio: 1,
+          canvasWidth: 1080,
+          canvasHeight: 1080,
+          cacheBust: true,
+        });
+        const base64 = dataUrl.split(',')[1];
+        zip.file(`criativo-${i + 1}.png`, base64, { base64: true });
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `esteira-criativos-${Date.now()}.zip`);
+    } catch (err: any) {
+      alert(`Erro ao gerar ZIP: ${err.message}`);
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
   // Gerar saida de um bloco (executa o flow)
   const handleGenerate = async (blockId: string) => {
     const block = blocks.find((b) => b.id === blockId);
@@ -313,6 +396,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     const briefing = inputBlocks.find((b) => b.type === 'briefing')?.data?.text || '';
     const style = inputBlocks.find((b) => b.type === 'style')?.data;
     const logo = inputBlocks.find((b) => b.type === 'logo')?.data?.imageUrl;
+    const expertBlock = inputBlocks.find((b) => b.type === 'expert');
+    const expertImage = expertBlock?.data?.imageUrl;
+    const expertPreserve = expertBlock?.data?.preserveIdentity ?? true;
     const references = inputBlocks
       .filter((b) => b.type === 'reference' && b.data?.imageUrl)
       .map((b) => b.data.imageUrl as string);
@@ -341,7 +427,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         const count = block.type === 'image-output' ? 1 : 4;
         const imageUrls: string[] = [];
         for (let i = 0; i < count; i++) {
-          const url = await generateImage(briefing, style, logo, apiKey, references);
+          const url = await generateImage(briefing, style, logo, apiKey, references, expertImage, expertPreserve);
           if (url) imageUrls.push(url);
         }
         setBlocks((prev) =>
@@ -384,6 +470,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 border border-purple-500/30"
           >
             <ImageIcon size={12} /> Logo
+          </button>
+          <button
+            onClick={() => handleCreateBlock('expert')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/30"
+            title="Foto do Expert/Apresentador (preserva identidade facial)"
+          >
+            <User size={12} /> Foto Expert
           </button>
           <button
             onClick={() => handleCreateBlock('reference')}
@@ -670,6 +763,73 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
+                {block.type === 'expert' && (
+                  <div className="space-y-1.5">
+                    {block.data.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={block.data.imageUrl}
+                          alt="Expert"
+                          className="w-full h-24 object-cover rounded-md bg-white/5"
+                        />
+                        <button
+                          onClick={() => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, imageUrl: null } } : b
+                              )
+                            );
+                          }}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-rose-500/30 rounded-md cursor-pointer hover:border-rose-500/60 transition-colors bg-rose-500/[0.04]">
+                        <User size={14} className="text-rose-400 mb-0.5" />
+                        <span className="text-[9px] text-rose-300 font-bold">Foto do Expert</span>
+                        <span className="text-[8px] text-gray-500">PNG recortado</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id ? { ...b, data: { ...b.data, imageUrl: reader.result as string } } : b
+                                )
+                              );
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                    )}
+                    <label className="flex items-center gap-1.5 text-[9px] text-gray-300 cursor-pointer pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={block.data.preserveIdentity ?? true}
+                        onChange={(e) => {
+                          setBlocks((prev) =>
+                            prev.map((b) =>
+                              b.id === block.id
+                                ? { ...b, data: { ...b.data, preserveIdentity: e.target.checked } }
+                                : b
+                            )
+                          );
+                        }}
+                        className="rounded border-white/20 bg-black/40 text-rose-500 focus:ring-rose-400"
+                      />
+                      <span className="leading-tight">Preservar identidade facial (recomendado)</span>
+                    </label>
+                  </div>
+                )}
+
                 {block.type === 'reference' && (
                   <div>
                     {block.data.imageUrl ? (
@@ -859,13 +1019,83 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       {/* MODAL DE OUTPUT DETALHADO */}
       {outputModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0d0f17] border border-white/10 rounded-3xl p-6">
+          <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto bg-[#0d0f17] border border-white/10 rounded-3xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">Resultado Gerado pela IA</h3>
-              <button onClick={() => setOutputModal(null)} className="text-gray-400 hover:text-white">
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                {Array.isArray(outputModal.output) && outputModal.output.length > 1 && (
+                  <button
+                    onClick={handleDownloadZip}
+                    disabled={downloadingZip}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-xs font-bold hover:opacity-90 disabled:opacity-50 shadow-md"
+                  >
+                    {downloadingZip ? <Loader2 size={13} className="animate-spin" /> : <Archive size={13} />}
+                    {downloadingZip ? 'Empacotando...' : `Baixar Todos (ZIP)`}
+                  </button>
+                )}
+                <button onClick={() => setOutputModal(null)} className="text-gray-400 hover:text-white p-1.5">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
+
+            {/* SLIDERS DE POSICAO DOS TEXTOS (X/Y %) */}
+            <div className="mb-5 p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  📐 Posição dos Textos (X / Y %)
+                </h4>
+                <button
+                  onClick={resetTextPositions}
+                  className="text-[10px] text-gray-400 hover:text-white px-2 py-1 rounded border border-white/10 hover:border-white/30"
+                >
+                  Resetar
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(['headline', 'support', 'cta'] as const).map((key) => (
+                  <div key={key} className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-emerald-300 uppercase tracking-wider">
+                        {key === 'headline' ? 'Headline' : key === 'support' ? 'Destaque' : 'CTA'}
+                      </span>
+                      <span className="text-gray-400 font-mono">
+                        X {Math.round(textPositions[key].x)}% · Y {Math.round(textPositions[key].y)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={textPositions[key].x}
+                      onChange={(e) =>
+                        setTextPositions((prev: TextPositions) => ({
+                          ...prev,
+                          [key]: { ...prev[key], x: Number(e.target.value) },
+                        }))
+                      }
+                      className="w-full accent-emerald-400"
+                      aria-label={`${key} X`}
+                    />
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={textPositions[key].y}
+                      onChange={(e) =>
+                        setTextPositions((prev: TextPositions) => ({
+                          ...prev,
+                          [key]: { ...prev[key], y: Number(e.target.value) },
+                        }))
+                      }
+                      className="w-full accent-emerald-400"
+                      aria-label={`${key} Y`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {Array.isArray(outputModal.output) ? (
               <div className="grid grid-cols-2 gap-3">
                 {outputModal.output.map((out: any, i: number) => (
@@ -874,12 +1104,30 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                       <>
                         <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
                           <img src={out} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-                          <div className="absolute inset-x-0 bottom-0 space-y-2 p-5 text-left">
-                            {creativeText.headline && <h4 className="text-2xl font-black uppercase leading-[0.95] text-white drop-shadow-lg">{creativeText.headline}</h4>}
-                            {creativeText.support && <p className="max-w-[90%] text-sm font-medium leading-tight text-white/90">{creativeText.support}</p>}
-                            {creativeText.cta && <span className="inline-flex rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black uppercase text-black">{creativeText.cta}</span>}
-                          </div>
+                          {creativeText.headline && (
+                            <h4
+                              className="absolute text-2xl font-black uppercase leading-[0.95] text-white drop-shadow-lg max-w-[85%]"
+                              style={{ left: `${textPositions.headline.x}%`, top: `${textPositions.headline.y}%` }}
+                            >
+                              {creativeText.headline}
+                            </h4>
+                          )}
+                          {creativeText.support && (
+                            <p
+                              className="absolute max-w-[85%] text-sm font-medium leading-tight text-white/90 drop-shadow"
+                              style={{ left: `${textPositions.support.x}%`, top: `${textPositions.support.y}%` }}
+                            >
+                              {creativeText.support}
+                            </p>
+                          )}
+                          {creativeText.cta && (
+                            <span
+                              className="absolute inline-flex rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black uppercase text-black shadow-lg"
+                              style={{ left: `${textPositions.cta.x}%`, top: `${textPositions.cta.y}%` }}
+                            >
+                              {creativeText.cta}
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={() => handleDownloadPreview(i)}
@@ -919,12 +1167,30 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                 <div id="flow-creative-preview-0" className="relative aspect-square overflow-hidden bg-black">
                   <img src={outputModal.output} alt="Resultado" className="absolute inset-0 h-full w-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 space-y-3 p-7 text-left">
-                    {creativeText.headline && <h4 className="text-4xl font-black uppercase leading-[0.95] text-white drop-shadow-lg">{creativeText.headline}</h4>}
-                    {creativeText.support && <p className="max-w-[90%] text-base font-medium leading-tight text-white/90">{creativeText.support}</p>}
-                    {creativeText.cta && <span className="inline-flex rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black uppercase text-black">{creativeText.cta}</span>}
-                  </div>
+                  {creativeText.headline && (
+                    <h4
+                      className="absolute text-4xl font-black uppercase leading-[0.95] text-white drop-shadow-lg max-w-[85%]"
+                      style={{ left: `${textPositions.headline.x}%`, top: `${textPositions.headline.y}%` }}
+                    >
+                      {creativeText.headline}
+                    </h4>
+                  )}
+                  {creativeText.support && (
+                    <p
+                      className="absolute max-w-[85%] text-base font-medium leading-tight text-white/90 drop-shadow"
+                      style={{ left: `${textPositions.support.x}%`, top: `${textPositions.support.y}%` }}
+                    >
+                      {creativeText.support}
+                    </p>
+                  )}
+                  {creativeText.cta && (
+                    <span
+                      className="absolute inline-flex rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black uppercase text-black shadow-lg"
+                      style={{ left: `${textPositions.cta.x}%`, top: `${textPositions.cta.y}%` }}
+                    >
+                      {creativeText.cta}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => handleDownloadPreview(0)}
@@ -962,6 +1228,7 @@ function getDefaultLabel(type: BlockType): string {
   switch (type) {
     case 'briefing': return 'Briefing';
     case 'logo': return 'Logo';
+    case 'expert': return 'Foto Expert';
     case 'reference': return 'Referência';
     case 'style': return 'Estilo';
     case 'copy-output': return 'Gerar Copy (4x)';
@@ -974,6 +1241,7 @@ function getDefaultData(type: BlockType): any {
   switch (type) {
     case 'briefing': return { text: '' };
     case 'logo': return { imageUrl: null };
+    case 'expert': return { imageUrl: null, preserveIdentity: true };
     case 'reference': return { imageUrl: null, filename: null };
     case 'style': return { tone: '', color: '#10b981' };
     default: return {};
@@ -1016,14 +1284,24 @@ async function generateImage(
   style: any,
   logoUrl: string | undefined,
   apiKey: string,
-  references: string[] = []
+  references: string[] = [],
+  expertImage: string | null = null,
+  expertPreserve: boolean = true
 ): Promise<string | null> {
   // Enriquece o prompt mencionando que ha referencias visuais
+  let identitySuffix = '';
+  if (expertImage && expertPreserve) {
+    identitySuffix = ' Featuring the same person from the reference photo, preserving facial identity, clothing style and overall mood.';
+  }
   const enhancedPrompt = references.length > 0
-    ? `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}. This image has ${references.length} visual reference(s) attached - use them as inspiration for style, composition, and mood.`
-    : `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}`;
+    ? `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}. This image has ${references.length} visual reference(s) attached - use them as inspiration for style, composition, and mood.${identitySuffix}`
+    : `${prompt}. Style: ${style?.tone || 'professional'}, colors: ${style?.color || 'emerald'}.${identitySuffix}`;
+
+  const refList = expertImage
+    ? [expertImage, logoUrl, ...references]
+    : [logoUrl, ...references];
   const referenceImages = await Promise.all(
-    [logoUrl, ...references]
+    refList
       .filter((value): value is string => Boolean(value))
       .slice(0, 4)
       .map((value) => optimizeImageDataUrl(value, 1280, 0.78))
