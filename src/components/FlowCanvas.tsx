@@ -34,7 +34,8 @@ export type BlockType =
   | 'style'
   | 'copy-output'
   | 'image-output'
-  | 'variations-output';
+  | 'variations-output'
+  | 'batch-output';
 
 export interface FlowBlock {
   id: string;
@@ -125,6 +126,13 @@ const BLOCK_CONFIG: Record<BlockType, {
     bgColor: 'bg-cyan-500/5',
     description: 'Gera 4 variações de imagem',
   },
+  'batch-output': {
+    icon: Zap,
+    color: 'text-violet-400',
+    borderColor: 'border-violet-500/40 hover:border-violet-500',
+    bgColor: 'bg-violet-500/5',
+    description: 'Lote de N criativos (1–12) com progresso',
+  },
 };
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand }) => {
@@ -134,6 +142,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [generateProgress, setGenerateProgress] = useState<{ current: number; total: number } | null>(null);
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
   const [creativeText, setCreativeText] = useState({ headline: '', support: '', cta: '' });
   const [downloadingPreview, setDownloadingPreview] = useState<number | null>(null);
@@ -403,7 +412,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       .filter((b) => b.type === 'reference' && b.data?.imageUrl)
       .map((b) => b.data.imageUrl as string);
 
-    if (!briefing && (block.type === 'copy-output' || block.type === 'image-output' || block.type === 'variations-output')) {
+    const requiresBriefing =
+      block.type === 'copy-output' ||
+      block.type === 'image-output' ||
+      block.type === 'variations-output' ||
+      block.type === 'batch-output';
+
+    if (!briefing && requiresBriefing) {
       alert('Conecte um bloco "Briefing" antes deste bloco de output. Arraste da bolinha direita do Briefing para a esquerda deste bloco.');
       return;
     }
@@ -423,10 +438,16 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           prev.map((b): FlowBlock => (b.id === blockId ? { ...b, output: variations } : b))
         );
         setOutputModal({ blockId, output: variations });
-      } else if (block.type === 'image-output' || block.type === 'variations-output') {
-        const count = block.type === 'image-output' ? 1 : 4;
+      } else if (block.type === 'image-output' || block.type === 'variations-output' || block.type === 'batch-output') {
+        let count = 1;
+        if (block.type === 'image-output') count = 1;
+        else if (block.type === 'variations-output') count = 4;
+        else if (block.type === 'batch-output') {
+          count = Math.min(Math.max(parseInt(String(block.data.count)) || 9, 1), 12);
+        }
         const imageUrls: string[] = [];
         for (let i = 0; i < count; i++) {
+          setGenerateProgress({ current: i + 1, total: count });
           const url = await generateImage(briefing, style, logo, apiKey, references, expertImage, expertPreserve);
           if (url) imageUrls.push(url);
         }
@@ -445,6 +466,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       alert(`Erro: ${err.message}`);
     } finally {
       setGenerating(null);
+      setGenerateProgress(null);
     }
   };
 
@@ -525,6 +547,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/30"
           >
             <Hash size={12} /> 4 Variações
+          </button>
+          <button
+            onClick={() => handleCreateBlock('batch-output')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border border-violet-500/30"
+            title="Lote de 1 a 12 criativos gerados a partir do mesmo briefing"
+          >
+            <Zap size={12} /> Lote N
           </button>
         </div>
       </div>
@@ -929,12 +958,42 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
+                {block.type === 'batch-output' && (
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold uppercase text-gray-400">
+                      Quantidade (1-12)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={block.data.count ?? 9}
+                      onChange={(e) => {
+                        const v = Math.min(Math.max(parseInt(e.target.value) || 1, 1), 12);
+                        setBlocks((prev) =>
+                          prev.map((b) =>
+                            b.id === block.id ? { ...b, data: { ...b.data, count: v } } : b
+                          )
+                        );
+                      }}
+                      className="w-full px-2 py-1.5 rounded-md bg-black/40 border border-white/10 text-white text-xs focus:border-violet-400 focus:outline-none"
+                    />
+                    <p className="text-[8px] text-gray-500 leading-tight">
+                      Tempo médio: ~{(block.data.count ?? 9) * 8}s
+                    </p>
+                  </div>
+                )}
+
                 {isOutput && (
                   <div className="min-h-[60px] flex flex-col items-center justify-center bg-black/20 rounded-md">
                     {generating === block.id ? (
                       <div className="flex flex-col items-center gap-1 py-2">
                         <Loader2 size={18} className={`${config.color} animate-spin`} />
-                        <span className="text-[9px] text-gray-400">Gerando...</span>
+                        <span className="text-[9px] text-gray-400">
+                          {generateProgress && block.type === 'batch-output'
+                            ? `Gerando ${generateProgress.current}/${generateProgress.total}...`
+                            : 'Gerando...'}
+                        </span>
                       </div>
                     ) : block.output ? (
                       <div className="w-full p-1.5 max-h-32 overflow-y-auto">
@@ -1234,6 +1293,7 @@ function getDefaultLabel(type: BlockType): string {
     case 'copy-output': return 'Gerar Copy (4x)';
     case 'image-output': return 'Gerar Imagem';
     case 'variations-output': return '4 Variações';
+    case 'batch-output': return 'Lote N';
   }
 }
 
@@ -1244,6 +1304,7 @@ function getDefaultData(type: BlockType): any {
     case 'expert': return { imageUrl: null, preserveIdentity: true };
     case 'reference': return { imageUrl: null, filename: null };
     case 'style': return { tone: '', color: '#10b981' };
+    case 'batch-output': return { count: 9 };
     default: return {};
   }
 }
