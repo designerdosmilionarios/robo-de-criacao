@@ -1739,7 +1739,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                       <div className="flex items-center gap-1">
                         <input
                           type="color"
-                          value={block.data.highlight?.color || '#fbbf24'}
+                          value={block.data.highlight?.color || '#10b981'}
                           onChange={(e) => {
                             setBlocks((prev) =>
                               prev.map((b) =>
@@ -2272,7 +2272,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             )}
                             {headlineToShow && (
                               <h4
-                                className="absolute uppercase leading-[0.98] tracking-[-0.035em]"
+                                className="absolute leading-[0.98] tracking-[-0.035em]"
                                 style={{
                                   left: `${textPositions.headline.x}%`,
                                   top: `${textPositions.headline.y}%`,
@@ -2285,7 +2285,18 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   textAlign: layoutConfig.align,
                                   textWrap: 'balance',
                                   overflowWrap: 'normal',
-                                  textShadow: '0 2px 18px rgba(0,0,0,.55)',
+                                  textTransform: typographyForModal?.headline?.uppercase === false ? 'none' : 'uppercase',
+                                  textShadow: typographyForModal?.headline?.shadow?.enabled !== false
+                                    ? `${typographyForModal?.headline?.shadow?.color || '#000000'} 0 4px 24px ${(typographyForModal?.headline?.shadow?.opacity ?? 80) / 100 * 0.9}px`
+                                    : 'none',
+                                  WebkitTextStroke: typographyForModal?.headline?.stroke?.enabled
+                                    ? `${typographyForModal.headline.stroke.width || 2}px ${typographyForModal.headline.stroke.color || '#000000'}`
+                                    : undefined,
+                                  padding: typographyForModal?.headline?.box?.enabled ? '12px 16px' : '0',
+                                  backgroundColor: typographyForModal?.headline?.box?.enabled
+                                    ? `${typographyForModal.headline.box.color || '#000000'}${Math.round((typographyForModal.headline.box.opacity ?? 60) * 2.55).toString(16).padStart(2, '0')}`
+                                    : 'transparent',
+                                  borderRadius: typographyForModal?.headline?.box?.enabled ? '8px' : '0',
                                 }}
                               >
                                 {renderHeadlineWithHighlight(headlineToShow, typographyForModal?.highlight)}
@@ -2305,7 +2316,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   color: typographyForModal?.support?.color || '#f5f5f5',
                                   textAlign: layoutConfig.align,
                                   textWrap: 'balance',
-                                  textShadow: '0 2px 12px rgba(0,0,0,.7)',
+                                  textShadow: typographyForModal?.support?.shadow?.enabled !== false
+                                    ? `${typographyForModal?.support?.shadow?.color || '#000000'} 0 2px 12px ${(typographyForModal?.support?.shadow?.opacity ?? 70) / 100 * 0.9}px`
+                                    : 'none',
+                                  padding: typographyForModal?.support?.box?.enabled ? '8px 12px' : '0',
+                                  backgroundColor: typographyForModal?.support?.box?.enabled
+                                    ? `${typographyForModal.support.box.color || '#000000'}${Math.round((typographyForModal.support.box.opacity ?? 50) * 2.55).toString(16).padStart(2, '0')}`
+                                    : 'transparent',
+                                  borderRadius: typographyForModal?.support?.box?.enabled ? '6px' : '0',
                                 }}
                               >
                                 {supportToShow}
@@ -2680,10 +2698,21 @@ function getDefaultData(type: BlockType): any {
     case 'style': return { tone: '', color: '#10b981' };
     case 'typography': return {
       fontFamily: 'Manrope',
-      headline: { weight: '800', size: 56, color: '#ffffff' },
-      support:  { weight: '400', size: 22, color: '#f5f5f5' },
+      headline: {
+        weight: '800', size: 56, color: '#ffffff',
+        box: { enabled: false, color: '#000000', opacity: 60 },
+        shadow: { enabled: true, color: '#000000', opacity: 80 },
+        stroke: { enabled: false, color: '#000000', width: 2 },
+        uppercase: true,
+      },
+      support: {
+        weight: '400', size: 22, color: '#f5f5f5',
+        box: { enabled: false, color: '#000000', opacity: 50 },
+        shadow: { enabled: true, color: '#000000', opacity: 70 },
+        uppercase: false,
+      },
       cta:      { weight: '700', size: 14, color: '#0a0b10', bgColor: '#10b981' },
-      highlight:    { color: '#fbbf24', underline: true },
+      highlight:    { color: '#10b981', underline: true, shadow: true },
     };
     case 'copies': return {
       items: [
