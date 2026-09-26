@@ -114,14 +114,6 @@ const cleanCopyField = (value: unknown) => {
   return /^\(?sem\s+(?:cta|texto|destaque)\)?$/i.test(text) ? '' : text;
 };
 
-const getAdaptiveHeadlineSize = (text: string, configuredSize: number, multiple: boolean) => {
-  const length = text.trim().length;
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  const safeMaximum = multiple ? 38 : 58;
-  const contentMaximum = length > 58 || words > 9 ? 30 : length > 42 || words > 7 ? 34 : length > 28 ? 40 : safeMaximum;
-  return Math.min(configuredSize, contentMaximum);
-};
-
 function buildCreativeImagePrompt(
   visualBrief: string,
   copy: { headline?: string; support?: string; cta?: string } | null,
@@ -245,6 +237,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
   const [pasteModal, setPasteModal] = useState<{ blockId: string } | null>(null);
   const [creativeText, setCreativeText] = useState({ headline: '', support: '', cta: '' });
+  const [previewTextSizes, setPreviewTextSizes] = useState({ headline: 44, support: 18, cta: 14 });
   const [downloadingPreview, setDownloadingPreview] = useState<number | null>(null);
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [loadingReferences, setLoadingReferences] = useState(false);
@@ -269,6 +262,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           cta: { x: Math.min(Math.max(parsed.cta?.x ?? 8, 4), 78), y: Math.min(Math.max(parsed.cta?.y ?? 80, 55), 88) },
         });
       }
+      const savedSizes = localStorage.getItem('flow_preview_text_sizes');
+      if (savedSizes) setPreviewTextSizes(JSON.parse(savedSizes));
     } catch {}
   }, []);
 
@@ -277,8 +272,29 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     try {
       localStorage.setItem('flow_text_positions', JSON.stringify(textPositions));
       localStorage.setItem('flow_creative_layout', creativeLayout);
+      localStorage.setItem('flow_preview_text_sizes', JSON.stringify(previewTextSizes));
     } catch {}
-  }, [textPositions, creativeLayout]);
+  }, [textPositions, creativeLayout, previewTextSizes]);
+
+  const updateModalCopy = (index: number, field: 'headline' | 'support' | 'cta', value: string) => {
+    if (!outputModal || !Array.isArray(outputModal.output)) return;
+    const currentOutput = outputModal.output;
+    const updatedOutput = currentOutput.map((item: any, itemIndex: number) => {
+      if (itemIndex !== index) return item;
+      const imageUrl = typeof item === 'string' ? item : item?.imageUrl;
+      const currentCopy = typeof item === 'object' && item?.copy
+        ? item.copy
+        : { headline: creativeText.headline, support: creativeText.support, cta: creativeText.cta };
+      return { imageUrl, copy: { ...currentCopy, [field]: value } };
+    });
+    setOutputModal({ ...outputModal, output: updatedOutput });
+    setBlocks((previous) => previous.map((block) => {
+      if (block.id !== outputModal.blockId) return block;
+      const pairedCopies = Array.isArray(block.data?.pairedCopies) ? [...block.data.pairedCopies] : [];
+      pairedCopies[index] = updatedOutput[index]?.copy || null;
+      return { ...block, data: { ...block.data, pairedCopies } };
+    }));
+  };
 
   const applyCreativeLayout = (layout: CreativeLayout) => {
     setCreativeLayout(layout);
@@ -2086,6 +2102,28 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               <p className="text-[10px] leading-relaxed text-gray-500">
                 O layout também orienta a IA a reservar uma área limpa na imagem. Use os controles abaixo apenas para ajustes finos.
               </p>
+              <div className="grid grid-cols-1 gap-3 border-y border-white/5 py-3 md:grid-cols-3">
+                {(['headline', 'support', 'cta'] as const).map((key) => (
+                  <label key={`size-${key}`} className="space-y-1.5">
+                    <span className="flex justify-between text-[10px] font-bold uppercase text-orange-300">
+                      <span>{key === 'headline' ? 'Título' : key === 'support' ? 'Apoio' : 'CTA'}</span>
+                      <span className="font-mono text-gray-400">{previewTextSizes[key]}px</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={key === 'headline' ? 24 : key === 'support' ? 12 : 10}
+                      max={key === 'headline' ? 72 : key === 'support' ? 32 : 24}
+                      value={previewTextSizes[key]}
+                      onChange={(event) => setPreviewTextSizes((current) => ({
+                        ...current,
+                        [key]: Number(event.target.value),
+                      }))}
+                      className="w-full accent-orange-400"
+                      aria-label={`Tamanho de ${key}`}
+                    />
+                  </label>
+                ))}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {(['headline', 'support', 'cta'] as const).map((key) => (
                   <div key={key} className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-1.5">
@@ -2205,11 +2243,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   const supportToShow = cleanCopyField(pairedCopy?.support || creativeText.support);
                   const ctaToShow = cleanCopyField(pairedCopy?.cta || creativeText.cta);
                   const layoutConfig = CREATIVE_LAYOUTS[creativeLayout];
-                  const headlineSize = getAdaptiveHeadlineSize(
-                    headlineToShow,
-                    typographyForModal?.headline?.size || 36,
-                    outputModal.output.length > 1
-                  );
+                  const headlineSize = previewTextSizes.headline;
 
                   return (
                     <div key={i} className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
@@ -2267,7 +2301,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   maxWidth: `${layoutConfig.textWidth}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.support?.weight || 400,
-                                  fontSize: `${Math.min(typographyForModal?.support?.size || 16, 18)}px`,
+                                  fontSize: `${previewTextSizes.support}px`,
                                   color: typographyForModal?.support?.color || '#f5f5f5',
                                   textAlign: layoutConfig.align,
                                   textWrap: 'balance',
@@ -2285,7 +2319,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   top: `${textPositions.cta.y}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.cta?.weight || 700,
-                                  fontSize: `${typographyForModal?.cta?.size || 14}px`,
+                                  fontSize: `${previewTextSizes.cta}px`,
                                   color: typographyForModal?.cta?.color || '#0a0b10',
                                   backgroundColor: typographyForModal?.cta?.bgColor || '#10b981',
                                   whiteSpace: 'nowrap',
@@ -2301,6 +2335,33 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                               {cleanCopyField(pairedCopy.cta) ? ` · ${cleanCopyField(pairedCopy.cta)}` : ''}
                             </div>
                           )}
+                          <div className="grid gap-2 border-t border-white/10 bg-[#0a0c12] p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-white">Editar textos</span>
+                              <span className="text-[9px] text-gray-500">Atualização instantânea</span>
+                            </div>
+                            <input
+                              value={headlineToShow}
+                              onChange={(event) => updateModalCopy(i, 'headline', event.target.value)}
+                              maxLength={60}
+                              placeholder="Headline"
+                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white outline-none focus:border-emerald-400"
+                            />
+                            <input
+                              value={supportToShow}
+                              onChange={(event) => updateModalCopy(i, 'support', event.target.value)}
+                              maxLength={100}
+                              placeholder="Texto de apoio"
+                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-emerald-400"
+                            />
+                            <input
+                              value={ctaToShow}
+                              onChange={(event) => updateModalCopy(i, 'cta', event.target.value)}
+                              maxLength={32}
+                              placeholder="CTA"
+                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white outline-none focus:border-emerald-400"
+                            />
+                          </div>
                           <button
                             onClick={() => handleDownloadPreview(i)}
                             disabled={downloadingPreview === i}
