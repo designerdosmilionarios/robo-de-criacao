@@ -946,7 +946,20 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             creativeLayout,
             Boolean(blockVisualPrompt || copyVisualPrompt)
           );
-          const url = await generateImage(directedVisualPrompt, style, logo, apiKey, references, expertImage, expertPreserve);
+          const url = await generateImage(
+            directedVisualPrompt,
+            style,
+            logo,
+            apiKey,
+            references,
+            expertImage,
+            expertPreserve,
+            sourceBlock.data?.preferredModel || 'auto',
+            sourceBlock.data?.aspectRatio || '4:5',
+            sourceBlock.data?.aspectRatio === '9:16' ? '1024x1536'
+              : sourceBlock.data?.aspectRatio === '1:1' ? '1024x1024'
+              : '1024x1536' // 4:5
+          );
           if (url) {
             items.push(copyForThis ? { imageUrl: url, copy: copyForThis } : { imageUrl: url });
           }
@@ -2260,6 +2273,52 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                         </div>
                       );
                     })()}
+
+                    {/* ASPECT RATIO + MODELO */}
+                    <div className="pt-1 grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider text-cyan-400">
+                          <Sparkles size={8} /> Aspect Ratio
+                        </label>
+                        <select
+                          value={block.data.aspectRatio || '4:5'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, aspectRatio: e.target.value } } : b
+                              )
+                            );
+                          }}
+                          className="w-full px-1.5 py-1 rounded bg-black/40 border border-cyan-500/30 text-white text-[10px]"
+                        >
+                          <option value="4:5">4:5 Feed (1080x1350)</option>
+                          <option value="1:1">1:1 Quadrado</option>
+                          <option value="9:16">9:16 Story (1080x1920)</option>
+                          <option value="16:9">16:9 Paisagem</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider text-cyan-400">
+                          <Sparkles size={8} /> Modelo IA
+                        </label>
+                        <select
+                          value={block.data.preferredModel || 'auto'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, preferredModel: e.target.value } } : b
+                              )
+                            );
+                          }}
+                          className="w-full px-1.5 py-1 rounded bg-black/40 border border-cyan-500/30 text-white text-[10px]"
+                        >
+                          <option value="auto">Auto (recomendado)</option>
+                          <option value="gpt-image-2.5-sunburst">Premium (sunburst)</option>
+                          <option value="gpt-image-2.5-flare">Balanceado (flare)</option>
+                          <option value="gpt-image-2">Rápido (gpt-image-2)</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -3224,7 +3283,10 @@ async function generateImage(
   apiKey: string,
   references: string[] = [],
   expertImage: string | null = null,
-  expertPreserve: boolean = true
+  expertPreserve: boolean = true,
+  preferredModel: string = 'auto',
+  aspectRatio: string = '1:1',
+  size: string = '1024x1024'
 ): Promise<string | null> {
   // Enriquece o prompt mencionando que ha referencias visuais
   let identitySuffix = '';
@@ -3250,10 +3312,10 @@ async function generateImage(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt: enhancedPrompt,
-      size: '1024x1024',
-      aspectRatio: '1:1',
+      size,
+      aspectRatio,
       provider: 'openai',
-      preferredModel: 'auto',
+      preferredModel: preferredModel || 'auto',
       apiKey,
       ...(referenceImages.length > 0 ? { referenceImages } : {}),
     }),

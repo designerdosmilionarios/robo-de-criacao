@@ -157,14 +157,46 @@ async function tryGoogleGemini(key: string, prompt: string, aspectRatio: string)
 function enhancePrompt(rawPrompt: string): string {
   const base = String(rawPrompt || '').trim();
   const core = base.length > 4 ? base.replace(/\.+$/, '').trim() : 'premium dark cinematic background for advertising';
-  return [
+
+  // Detecta se o prompt do usuario ja tem detalhes tecnicos (camera, lens, lighting, etc)
+  const hasTechnicalDetails = /(canon|nikon|sony|85mm|50mm|35mm|f\/[0-9]|full[- ]?frame|iso|shutter|aperture|lighting|rim light|key light|backlight|softbox|three[- ]?point)/i.test(base);
+
+  // Detecta se o usuario ja especificou NEGATIVE (NAO mostrar X)
+  const hasNegativeSpec = /(NEGATIVE|AVOID|DO NOT|NÃO MOSTRE|NAO MOSTRE|without|no [a-z])/i.test(base);
+
+  // Detecta se prompt ja e' especifico (>= 200 chars)
+  const isDetailed = base.length > 200;
+
+  // Se o prompt ja e' detalhado E tem detalhes tecnicos, NAO duplicamos as instrucoes do enhancer
+  // Apenas adicionamos a instrucao de "no text/watermark" e "keep negative space"
+  if (isDetailed && hasTechnicalDetails) {
+    return [
+      core,
+      'IMPORTANT: This prompt is detailed and specific. Follow it literally. Do not add generic elements.',
+      'Do not add text, words, letters, numbers, watermarks, signatures or logos to the image. Typography will be overlaid later.',
+      'Keep the reserved negative-space area calm, low-detail and high-contrast for typography overlay.',
+    ].join('. ');
+  }
+
+  // Para prompts curtos ou genericos, aplicar enhancer completo
+  const enhancements = [
     core,
     'Single unified scene created for a premium advertising campaign. Make the subject, environment and visual metaphor directly relevant to the specific offer and audience described. Editorial art direction, intentional lighting, believable materials, natural skin texture when people are present, sophisticated color grading and strong focal hierarchy',
     'IMPORTANT: Generate ONE single unified image. NOT side-by-side comparison. NOT before/after. NOT split screen. NOT multiple panels.',
-    'Do not fall back to generic marketing imagery. Do not show smartphones, dashboards, charts, social media icons, handshakes, light bulbs or random office scenes unless the brief explicitly asks for them.',
-    'Avoid in the image: unintended text, words, letters, numbers, watermarks, signatures, unrequested logos, busy backgrounds, stock-photo clichés, ugly artifacts, plastic skin, oversaturated colors, blur, distorted anatomy, extra fingers.',
-    'Respect the exact negative-space and subject-placement instructions in the prompt because typography will be overlaid later. Keep the reserved text area calm, low-detail and high-contrast.',
-  ].filter(Boolean).join('. ');
+  ];
+
+  // So adiciona restricao de "no generic" se o usuario nao especificou negative
+  if (!hasNegativeSpec) {
+    enhancements.push('Do not fall back to generic marketing imagery. Do not show smartphones, dashboards, charts, social media icons, handshakes, light bulbs or random office scenes unless the brief explicitly asks for them.');
+  }
+
+  enhancements.push('Avoid in the image: unintended text, words, letters, numbers, watermarks, signatures, unrequested logos, busy backgrounds, stock-photo clichés, ugly artifacts, plastic skin, oversaturated colors, blur, distorted anatomy, extra fingers.');
+
+  if (isDetailed) {
+    enhancements.push('Respect the exact negative-space and subject-placement instructions in the prompt because typography will be overlaid later. Keep the reserved text area calm, low-detail and high-contrast.');
+  }
+
+  return enhancements.filter(Boolean).join('. ');
 }
 
 function detectProvider(key: string): 'openai' | 'Opus 4.8' | 'unknown' {
