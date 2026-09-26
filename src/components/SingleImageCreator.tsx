@@ -32,8 +32,6 @@ import {
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
 import { optimizeImageDataUrl } from '@/lib/imageData';
-import { CreativeDirectorPanel } from '@/components/CreativeDirectorPanel';
-import { buildDirectedPrompt } from '@/lib/creativeDirector';
 import {
   TypographyControl,
   DEFAULT_TYPOGRAPHY,
@@ -98,35 +96,23 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   // Modelo de IA escolhido pelo usuário (auto = tenta do melhor pro pior)
   const [selectedModel, setSelectedModel] = usePersistedState<string>('single_model', 'auto');
 
-  // =========================================
-  // Direção artística (paridade com carrossel)
-  // =========================================
-  const [artDirection, setArtDirection] = usePersistedState<'minimalista' | 'editorial' | 'dramatico' | 'cinematografico'>(
-    'single_art_direction',
-    'editorial'
-  );
-  const [visualCategory, setVisualCategory] = usePersistedState<string>('single_visual_category', 'citacao');
-  const [artBriefing, setArtBriefing] = usePersistedState<string>('single_art_briefing', '');
+  // Diretor Criativo REMOVIDO — o bgPrompt vai direto para a IA sem modificacoes.
+  // O usuario tem controle total sobre o prompt usado.
 
   useEffect(() => {
     if (!SUPPORTED_IMAGE_MODELS.includes(selectedModel)) setSelectedModel('auto');
   }, [selectedModel, setSelectedModel]);
 
-  // Compõe o prompt com base na direção artística (ou cai pro bgPrompt cru)
+  // Diretor Criativo removido: o bgPrompt vai DIRETAMENTE para a IA.
+  // Apenas adicionamos uma instrucao de "no text" para a IA nao renderizar tipografia.
   const composePromptForGeneration = (): string => {
-    const hasDirection = !!(artDirection || visualCategory || artBriefing);
-    const supportsPerson = artDirection === 'dramatico' || artDirection === 'cinematografico';
-    if (!hasDirection) {
-      return bgPrompt || 'premium dark cinematic background for advertising';
+    const userPrompt = (bgPrompt || '').trim();
+    if (!userPrompt) {
+      return 'premium dark cinematic background for advertising';
     }
-    const composed = buildDirectedPrompt({
-      briefing: artBriefing || headline || 'Criativo único',
-      direction: artDirection,
-      visualCategory,
-      style: 'premium',
-      personPhoto: supportsPerson && !!personImage,
-    });
-    return composed.prompt;
+    // Prompt do usuario vai LITERALMENTE, sem modificacao.
+    // Apenas adicionamos instrucao de "no text" no final.
+    return `${userPrompt}. IMPORTANT: Do NOT add any text, words, letters, numbers or watermarks to the image. Typography will be overlaid separately.`;
   };
 
   // Foto do personagem tem prioridade sobre referenceImage para preservar identidade
@@ -171,11 +157,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [refinementInstruction, setRefinementInstruction] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [refinementHistory, setRefinementHistory] = useState<Array<{ instruction: string; result: string }>>([]);
-
-  // MESTRE DOS PROMPTS (Genos-style)
-  const [masterPromptInput, setMasterPromptInput] = useState('');
-  const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
-  const [masterPromptLog, setMasterPromptLog] = useState<string[]>([]);
 
   // Imagem de Referência para a IA guiar o estilo
   const [referenceImage, setReferenceImage] = usePersistedState<string | null>('single_ref_image', null);
@@ -325,9 +306,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         generatedGallery,
         editMode,
         selectedModel,
-        artDirection,
-        visualCategory,
-        artBriefing,
       },
       load: (data: any) => {
         if (data.format) setFormat(data.format);
@@ -374,9 +352,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if (Array.isArray(data.generatedGallery)) setGeneratedGallery(data.generatedGallery);
         if (data.editMode === 'auto' || data.editMode === 'free') setEditMode(data.editMode);
         if (typeof data.selectedModel === 'string') setSelectedModel(data.selectedModel);
-        if (data.artDirection) setArtDirection(data.artDirection);
-        if (data.visualCategory) setVisualCategory(data.visualCategory);
-        if (typeof data.artBriefing === 'string') setArtBriefing(data.artBriefing);
       },
     });
   }, [
@@ -425,9 +400,6 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     generatedGallery,
     editMode,
     selectedModel,
-    artDirection,
-    visualCategory,
-    artBriefing,
   ]);
 
   // Sincronizar imagem externa enviada do Estúdio de Poses
@@ -491,7 +463,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       setBgError('Configure sua chave de API no topo antes de gerar.');
       return;
     }
-    if (!bgPrompt && !referenceImage && !artDirection && !visualCategory && !artBriefing) {
+    if (!bgPrompt && !referenceImage) {
       setBgError('Digite um prompt ou anexe uma imagem de referência visual.');
       return;
     }
@@ -553,7 +525,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       setBgError('Configure sua chave de API antes.');
       return;
     }
-    if (!bgPrompt && !referenceImage && !artDirection && !visualCategory && !artBriefing) {
+    if (!bgPrompt && !referenceImage) {
       setBgError('Digite um prompt antes de gerar variações.');
       return;
     }
@@ -667,45 +639,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     }
   };
 
-  // MESTRE DOS PROMPTS - chama o endpoint que usa OpenAI Chat para otimizar
-  const handleMasterPrompt = async () => {
-    if (!apiKey) {
-      setBgError('Configure sua chave de API antes.');
-      return;
-    }
-    if (!masterPromptInput.trim()) {
-      setBgError('Digite um brief ou prompt para o Mestre otimizar.');
-      return;
-    }
-
-    setIsOptimizingPrompt(true);
-    setBgError(null);
-
-    try {
-      const res = await fetch('/api/master-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brief: masterPromptInput,
-          apiKey,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro no Mestre dos Prompts.');
-
-      // Substitui o prompt do usuário pelo otimizado
-      setBgPrompt(data.prompt);
-      setMasterPromptLog((prev) => [
-        `📝 Brief: ${masterPromptInput}\n✨ Prompt otimizado: ${data.prompt}`,
-        ...prev,
-      ].slice(0, 5));
-      setMasterPromptInput('');
-    } catch (err: any) {
-      setBgError(err.message || 'Erro no Mestre dos Prompts.');
-    } finally {
-      setIsOptimizingPrompt(false);
-    }
-  };
+  // MESTRE DOS PROMPTS REMOVIDO — o usuario controla 100% do prompt via bgPrompt.
 
   // Exportação do criativo em PNG e PSD.
   const [exportingPsd, setExportingPsd] = useState<'exact' | 'editable' | null>(null);
@@ -1871,27 +1805,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             <TextGradientOverlay config={textOverlay} onChange={setTextOverlay} />
           </div>
 
-          {/* SEÇÃO 0: DIRETOR CRIATIVO IA - INTELIGENCIA CRIATIVA */}
-          <CreativeDirectorPanel
-            onApplyPrompt={(text) => setBgPrompt(text)}
-            onApplyHeadline={(text) => setHeadline(text)}
-            onApplyHighlight={(text) => setHighlightText(text)}
-            onApplySubline={(text) => setSubline(text)}
-            onApplyCta={(text) => setCtaText(text)}
-            onApplyTag={(text) => setTag(text)}
-            brandColors={{
-              primaryColor: brand.primaryColor,
-              secondaryColor: brand.secondaryColor,
-              backgroundColor: brand.backgroundColor,
-            }}
-            initialArtDirection={artDirection}
-            initialVisualCategory={visualCategory}
-            initialArtBriefing={artBriefing}
-            personImage={personImage}
-            onChangeArtDirection={(d) => setArtDirection(d)}
-            onChangeVisualCategory={(id) => setVisualCategory(id)}
-            onChangeArtBriefing={(b) => setArtBriefing(b)}
-          />
+          {/* SEÇÃO 0 REMOVIDA: DIRETOR CRIATIVO IA — agora o usuario controla 100% do prompt via bgPrompt. */}
 
           {/* SEÇÃO 4: PESSOA REAL */}
           <div className="p-5 2xl:p-6 rounded-3xl bg-[#0e111a] border border-white/10 shadow-xl space-y-4">
@@ -2047,36 +1961,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             )}
 
             <div className="space-y-2">
-              {/* MESTRE DOS PROMPTS - Genos-style */}
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/10 to-blue-500/5 border border-purple-500/30 space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Wand2 size={13} className="text-purple-400" />
-                  <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider">Mestre dos Prompts</span>
-                  <span className="text-[9px] font-mono text-purple-400 ml-auto">powered by ChatGPT</span>
-                </div>
-                <textarea
-                  rows={2}
-                  value={masterPromptInput}
-                  onChange={(e) => setMasterPromptInput(e.target.value)}
-                  placeholder="Brief curto: ex: 'smartphone premium em fundo escuro com luzes neon'"
-                  className="w-full px-3 py-2 rounded-xl bg-black/30 border border-purple-500/20 text-white placeholder-gray-500 text-xs focus:border-purple-500 focus:outline-none resize-none"
-                />
-                <button
-                  onClick={handleMasterPrompt}
-                  disabled={isOptimizingPrompt}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/30 hover:bg-purple-500/40 text-purple-100 border border-purple-500/40 transition-all disabled:opacity-50"
-                >
-                  {isOptimizingPrompt ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" /> Otimizando prompt...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={12} /> Transformar em prompt profissional
-                    </>
-                  )}
-                </button>
-              </div>
+              {/* MESTRE DOS PROMPTS REMOVIDO — usuario controla 100% do prompt */}
 
               <textarea
                 rows={2}
