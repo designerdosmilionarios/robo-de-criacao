@@ -17,6 +17,7 @@ import { SaveProjectModal } from '@/components/SaveProjectModal';
 import { FlowCanvas } from '@/components/FlowCanvas';
 import { ApiKeyGuide } from '@/components/ApiKeyGuide';
 import { AuthScreen } from '@/components/AuthScreen';
+import { CampaignCreator } from '@/components/CampaignCreator';
 import { useAuth } from '@/lib/useAuth';
 import { useProjects } from '@/lib/useProjects';
 import { useLocalFonts } from '@/lib/useLocalFonts';
@@ -25,6 +26,7 @@ import {
   Palette,
   Layers,
   Wand2,
+  Zap,
   ChevronLeft,
   ChevronRight,
   FolderDown,
@@ -46,7 +48,7 @@ import JSZip from 'jszip';
 import saveAs from 'file-saver';
 
 type AIProvider = 'openai';
-type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects' | 'flow' | 'api-guide';
+type ActiveTab = 'carousel' | 'single-image' | 'poses' | 'batch-ads' | 'fonts' | 'projects' | 'flow' | 'campaign' | 'api-guide';
 
 export default function Home() {
   // Autenticação e Sessão
@@ -583,6 +585,16 @@ export default function Home() {
               <GitBranch size={13} /> Esteira IA
             </button>
             <button
+              onClick={() => setActiveTab('campaign')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'campaign'
+                  ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-dark-900 shadow-md'
+                  : 'text-amber-400/90 hover:text-amber-300'
+              }`}
+            >
+              <Zap size={13} /> Campanha 3x
+            </button>
+            <button
               onClick={() => setActiveTab('fonts')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'fonts' ? 'bg-brand-500 text-dark-900 shadow-md' : 'text-gray-400 hover:text-white'
@@ -830,6 +842,10 @@ export default function Home() {
             onDuplicateProject={duplicateProject}
             onImportProjects={importProjects}
           />
+        )}
+
+        {activeTab === 'campaign' && (
+          <CampaignCreator brand={activeBrand} apiKey={apiKey} />
         )}
 
         {activeTab === 'flow' && (
