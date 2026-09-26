@@ -32,10 +32,10 @@ const VISUAL_ANGLES: Array<{
 }> = [
   {
     id: 'pessoa',
-    label: 'Pessoa',
+    label: 'Pessoa (Conflito)',
     emoji: '👤',
-    description: 'Foto editorial de pessoa (médico, paciente, especialista)',
-    template: 'Cinematic editorial portrait photograph of {subject}, modern medical clinic setting with premium interior design, soft natural window lighting with rim light, 85mm portrait lens f/2.0 shallow depth of field, sophisticated off-white and deep emerald green color palette, contemporary minimalist aesthetic, premium magazine cover quality.',
+    description: 'Médica olhando o celular com expressão preocupada vs sorrindo',
+    template: 'Editorial photography for medical marketing. SPLIT COMPOSITION: left side (35%) shows frustrated female doctor in elegant white coat looking at smartphone with disappointed expression, right side (65%) shows same confident doctor with warm smile gesturing toward premium medical clinic interior with floor-to-ceiling windows. The visual contrast MUST convey the message: more followers do not equal more patients. Off-white and deep emerald green color palette, soft natural window lighting with rim light, 85mm portrait lens f/2.0, premium magazine cover quality.',
     copy: {
       headline: 'Mais *seguidores* não significam mais pacientes.',
       support: 'Sua clínica tem audiência qualificada mas agendamentos travados. Vamos construir autoridade médica real.',
@@ -44,10 +44,10 @@ const VISUAL_ANGLES: Array<{
   },
   {
     id: 'dashboard',
-    label: 'Dashboard',
+    label: 'Dashboard (Métricas)',
     emoji: '📊',
-    description: 'Mockup de dashboard/analytics com números',
-    template: 'Premium dark analytics dashboard mockup for medical clinic Instagram account, floating glass morphism UI cards with subtle glow, dramatic charts showing dramatic contrast between high engagement metrics and low conversion rates, emerald green and gold accent colors, editorial SaaS product photography lighting, sophisticated premium agency aesthetic.',
+    description: 'Dashboard mostrando curtidas altas vs agendamentos zerados',
+    template: 'Premium dark analytics dashboard showing INSTAGRAM metrics for medical clinic account. VISUAL HIERARCHY: TOP shows LARGE green numbers (Followers 1.2M, Likes 86K, Comments 24K) with growth arrows, BOTTOM shows tiny dim red number (Appointments 2) with downward arrow. The dramatic size contrast MUST emphasize the message: engagement does not equal conversions. Glass morphism panels, emerald green and gold accent colors, editorial SaaS aesthetic. NO TEXT shown in image other than numbers.',
     copy: {
       headline: 'Curtidas não pagam as contas da *clínica*.',
       support: 'Acompanhe conversões reais no WhatsApp, não likes efêmeros. Marketing médico que converte.',
@@ -56,10 +56,10 @@ const VISUAL_ANGLES: Array<{
   },
   {
     id: 'ambiente',
-    label: 'Ambiente',
+    label: 'Ambiente (Autoridade)',
     emoji: '🏛️',
-    description: 'Ambiente/cenário arquitetônico moderno',
-    template: 'Cinematic environmental photograph of {subject}, sophisticated modern medical clinic interior with floor to ceiling windows showing city skyline, minimalist light wood furniture, deep emerald green accents, off-white marble walls, soft natural daylight from multiple windows, editorial architecture digest aesthetic, premium medical facility photography.',
+    description: 'Médico no centro, concorrentes atrás desfocados',
+    template: 'Cinematic photography for medical positioning. CENTER foreground: confident 50-year-old male doctor in elegant suit (NOT white coat), looking directly at camera with authority. BACKGROUND: 5-7 other doctors from competitors blurred with shallow depth of field, all in neutral tones. The contrast MUST show the medical professional standing out as the PREMIUM AUTHORITY in his field. Modern medical clinic lobby background, off-white marble walls, deep emerald accents, editorial architecture digest aesthetic, 35mm lens f/1.8, premium premium magazine cover quality.',
     copy: {
       headline: 'A *autoridade* que sua clínica merece.',
       support: 'Posicione-se como referência premium antes da concorrência. Construa percepção de valor real.',
@@ -68,10 +68,10 @@ const VISUAL_ANGLES: Array<{
   },
   {
     id: 'mockup',
-    label: 'Mockup',
+    label: 'Mockup (Conteúdo)',
     emoji: '📱',
-    description: 'Mockup de smartphone/produto',
-    template: 'Premium iPhone mockup displaying sophisticated medical marketing Instagram interface, floating at slight 15 degree angle, glass morphism UI elements with emerald green accent buttons, dramatic studio rim lighting, deep dark navy background with subtle radial gradient, sophisticated product photography aesthetic, editorial premium magazine quality.',
+    description: 'Smartphone mostrando feed do Instagram profissional',
+    template: 'Premium iPhone mockup at 15 degree angle showing sophisticated medical clinic Instagram profile. Screen displays a beautiful carousel post with medical authority content (educational about a procedure) receiving high engagement. Profile shows 1.2M followers but the post shows real CONSULTATIONS count. The visual MUST convey: quality content drives real patient bookings, not vanity metrics. Glass morphism UI elements, dark navy background with subtle radial gradient, emerald green accent buttons, dramatic studio rim lighting, editorial premium magazine quality. NO TEXT shown in image other than Instagram UI numbers.',
     copy: {
       headline: 'Conteúdo que *converte* agendamentos.',
       support: 'Estrategia digital premium para clínicas que querem crescer com autoridade e pacientes qualificados.',
