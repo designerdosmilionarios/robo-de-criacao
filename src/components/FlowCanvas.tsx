@@ -222,9 +222,172 @@ const BLOCK_CONFIG: Record<BlockType, {
     color: 'text-violet-400',
     borderColor: 'border-violet-500/40 hover:border-violet-500',
     bgColor: 'bg-violet-500/5',
-    description: 'Lote de N criativos (1–12) com progresso',
+    description: 'Lote de N criativos (1-12) com progresso',
   },
 };
+
+// Templates de tipografia pre-prontos
+// Cada template retorna o objeto data completo para aplicar no bloco Tipografia
+const TYPOGRAPHY_TEMPLATES: Array<{
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  data: any;
+}> = [
+  {
+    id: 'bold-editorial',
+    name: 'Bold Editorial',
+    emoji: '🔥',
+    description: 'Manrope 800, gradient, caixa preta, sombra forte',
+    data: {
+      fontFamily: 'Manrope',
+      headline: {
+        weight: '800', size: 60, color: '#ffffff', letterSpacing: -1,
+        italic: false, uppercase: true,
+        box: { enabled: true, color: '#000000', opacity: 70 },
+        shadow: { enabled: true, color: '#000000', opacity: 90 },
+        stroke: { enabled: false, color: '#000000', width: 2 },
+        gradient: { enabled: true, from: '#fbbf24', to: '#10b981', angle: 90 },
+      },
+      support: {
+        weight: '500', size: 22, color: '#f5f5f5', letterSpacing: 0.5,
+        italic: false, uppercase: false,
+        box: { enabled: false, color: '#000000', opacity: 50 },
+        shadow: { enabled: true, color: '#000000', opacity: 80 },
+        stroke: { enabled: false, color: '#000000', width: 1 },
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      cta: {
+        weight: '700', size: 14, color: '#0a0b10', bgColor: '#10b981', letterSpacing: 1,
+        gradient: { enabled: true, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      highlight: { color: '#fbbf24', underline: true, shadow: true },
+    },
+  },
+  {
+    id: 'premium-clean',
+    name: 'Premium Clean',
+    emoji: '✨',
+    description: 'Manrope 600, branco, sombra suave, clean',
+    data: {
+      fontFamily: 'Manrope',
+      headline: {
+        weight: '600', size: 64, color: '#ffffff', letterSpacing: -0.8,
+        italic: false, uppercase: true,
+        box: { enabled: false, color: '#000000', opacity: 60 },
+        shadow: { enabled: true, color: '#000000', opacity: 60 },
+        stroke: { enabled: false, color: '#000000', width: 2 },
+        gradient: { enabled: false, from: '#fbbf24', to: '#10b981', angle: 90 },
+      },
+      support: {
+        weight: '300', size: 24, color: '#f5f5f5', letterSpacing: 0.2,
+        italic: false, uppercase: false,
+        box: { enabled: false, color: '#000000', opacity: 50 },
+        shadow: { enabled: true, color: '#000000', opacity: 70 },
+        stroke: { enabled: false, color: '#000000', width: 1 },
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      cta: {
+        weight: '500', size: 13, color: '#ffffff', bgColor: '#0a0b10', letterSpacing: 2,
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      highlight: { color: '#10b981', underline: true, shadow: false },
+    },
+  },
+  {
+    id: 'luxury-gold',
+    name: 'Luxury Gold',
+    emoji: '💎',
+    description: 'Manrope 700 italic, gradient dourado, premium',
+    data: {
+      fontFamily: 'Manrope',
+      headline: {
+        weight: '700', size: 58, color: '#fef3c7', letterSpacing: 2,
+        italic: true, uppercase: true,
+        box: { enabled: false, color: '#000000', opacity: 60 },
+        shadow: { enabled: true, color: '#000000', opacity: 70 },
+        stroke: { enabled: false, color: '#000000', width: 2 },
+        gradient: { enabled: true, from: '#fbbf24', to: '#f59e0b', angle: 45 },
+      },
+      support: {
+        weight: '400', size: 20, color: '#fef3c7', letterSpacing: 1,
+        italic: true, uppercase: false,
+        box: { enabled: false, color: '#000000', opacity: 50 },
+        shadow: { enabled: true, color: '#000000', opacity: 70 },
+        stroke: { enabled: false, color: '#000000', width: 1 },
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      cta: {
+        weight: '700', size: 14, color: '#0a0b10', bgColor: '#fbbf24', letterSpacing: 3,
+        gradient: { enabled: true, from: '#fbbf24', to: '#f59e0b', angle: 90 },
+      },
+      highlight: { color: '#fbbf24', underline: true, shadow: true },
+    },
+  },
+  {
+    id: 'newspaper',
+    name: 'Newspaper',
+    emoji: '📰',
+    description: 'Playfair Display serif, classico editorial',
+    data: {
+      fontFamily: 'Playfair Display',
+      headline: {
+        weight: '800', size: 72, color: '#ffffff', letterSpacing: -1,
+        italic: false, uppercase: false,
+        box: { enabled: false, color: '#000000', opacity: 60 },
+        shadow: { enabled: true, color: '#000000', opacity: 90 },
+        stroke: { enabled: false, color: '#000000', width: 2 },
+        gradient: { enabled: false, from: '#fbbf24', to: '#10b981', angle: 90 },
+      },
+      support: {
+        weight: '400', size: 22, color: '#e5e7eb', letterSpacing: 0,
+        italic: true, uppercase: false,
+        box: { enabled: false, color: '#000000', opacity: 50 },
+        shadow: { enabled: true, color: '#000000', opacity: 80 },
+        stroke: { enabled: false, color: '#000000', width: 1 },
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      cta: {
+        weight: '600', size: 13, color: '#0a0b10', bgColor: '#fbbf24', letterSpacing: 3,
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      highlight: { color: '#fbbf24', underline: false, shadow: true },
+    },
+  },
+  {
+    id: 'wellness',
+    name: 'Wellness',
+    emoji: '💚',
+    description: 'Manrope clean, verde suave, area da saude',
+    data: {
+      fontFamily: 'Manrope',
+      headline: {
+        weight: '700', size: 56, color: '#a7f3d0', letterSpacing: -0.3,
+        italic: false, uppercase: true,
+        box: { enabled: false, color: '#000000', opacity: 60 },
+        shadow: { enabled: true, color: '#000000', opacity: 70 },
+        stroke: { enabled: false, color: '#000000', width: 2 },
+        gradient: { enabled: false, from: '#a7f3d0', to: '#6ee7b7', angle: 90 },
+      },
+      support: {
+        weight: '400', size: 20, color: '#d1fae5', letterSpacing: 0.5,
+        italic: false, uppercase: false,
+        box: { enabled: false, color: '#000000', opacity: 50 },
+        shadow: { enabled: true, color: '#000000', opacity: 60 },
+        stroke: { enabled: false, color: '#000000', width: 1 },
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
+      cta: {
+        weight: '600', size: 13, color: '#064e3b', bgColor: '#a7f3d0', letterSpacing: 1.5,
+        gradient: { enabled: true, from: '#a7f3d0', to: '#6ee7b7', angle: 90 },
+      },
+      highlight: { color: '#6ee7b7', underline: true, shadow: false },
+    },
+  },
+];
+
+// Templates de tipografia pre-prontos já definidos acima.
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand }) => {
   const [blocks, setBlocks] = useState<FlowBlock[]>([]);
@@ -1571,6 +1734,34 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                       </select>
                     </div>
 
+                    {/* BOTAO DE TEMPLATES */}
+                    <div className="rounded-md bg-orange-500/10 border border-orange-500/30 p-1.5 space-y-1">
+                      <label className="block text-[8px] font-bold uppercase text-orange-300">📋 Templates Pre-prontos</label>
+                      <div className="grid grid-cols-1 gap-1">
+                        {TYPOGRAPHY_TEMPLATES.map((tpl) => (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            onClick={() => {
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id ? { ...b, data: { ...b.data, ...tpl.data } } : b
+                                )
+                              );
+                            }}
+                            className="w-full text-left px-2 py-1.5 rounded-md bg-black/30 hover:bg-orange-500/20 border border-white/10 hover:border-orange-500/40 transition-all"
+                            title={tpl.description}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="text-[12px]">{tpl.emoji}</span>
+                              <span className="text-[10px] font-bold text-orange-200">{tpl.name}</span>
+                            </div>
+                            <p className="text-[8px] text-gray-400 leading-tight mt-0.5">{tpl.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* HEADLINE */}
                     <div className="rounded-md bg-black/30 border border-white/10 p-1.5 space-y-1">
                       <label className="block text-[8px] font-bold uppercase text-orange-300">Headline</label>
@@ -1622,6 +1813,26 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           }}
                           className="flex-1 accent-orange-400"
                           aria-label="Headline size"
+                        />
+                      </div>
+                      {/* Letter-spacing do Headline */}
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="font-mono">sp {(block.data.headline?.letterSpacing ?? -0.5).toFixed(1)}px</span>
+                        <input
+                          type="range"
+                          min={-3}
+                          max={10}
+                          step={0.5}
+                          value={block.data.headline?.letterSpacing ?? -0.5}
+                          onChange={(e) => {
+                            setBlocks((prev) => prev.map((b) =>
+                              b.id === block.id
+                                ? { ...b, data: { ...b.data, headline: { ...b.data.headline, letterSpacing: Number(e.target.value) } } }
+                                : b
+                            ));
+                          }}
+                          className="flex-1 accent-orange-400"
+                          aria-label="Headline letter-spacing"
                         />
                       </div>
                       {/* Italic + Gradient para Headline */}
@@ -1739,6 +1950,26 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           }}
                           className="flex-1 accent-orange-400"
                           aria-label="Support size"
+                        />
+                      </div>
+                      {/* Letter-spacing do Destaque */}
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="font-mono">sp {(block.data.support?.letterSpacing ?? 0).toFixed(1)}px</span>
+                        <input
+                          type="range"
+                          min={-2}
+                          max={6}
+                          step={0.1}
+                          value={block.data.support?.letterSpacing ?? 0}
+                          onChange={(e) => {
+                            setBlocks((prev) => prev.map((b) =>
+                              b.id === block.id
+                                ? { ...b, data: { ...b.data, support: { ...b.data.support, letterSpacing: Number(e.target.value) } } }
+                                : b
+                            ));
+                          }}
+                          className="flex-1 accent-orange-400"
+                          aria-label="Support letter-spacing"
                         />
                       </div>
                       {/* Italic + Gradient para Destaque */}
@@ -1894,6 +2125,26 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             />
                           </>
                         )}
+                      </div>
+                      {/* Letter-spacing do CTA */}
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="font-mono">sp {(block.data.cta?.letterSpacing ?? 1).toFixed(1)}px</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={6}
+                          step={0.5}
+                          value={block.data.cta?.letterSpacing ?? 1}
+                          onChange={(e) => {
+                            setBlocks((prev) => prev.map((b) =>
+                              b.id === block.id
+                                ? { ...b, data: { ...b.data, cta: { ...b.data.cta, letterSpacing: Number(e.target.value) } } }
+                                : b
+                            ));
+                          }}
+                          className="flex-1 accent-orange-400"
+                          aria-label="CTA letter-spacing"
+                        />
                       </div>
                     </div>
 
@@ -2448,6 +2699,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.headline?.weight || 800,
                                   fontStyle: typographyForModal?.headline?.italic ? 'italic' : 'normal',
+                                  letterSpacing: `${typographyForModal?.headline?.letterSpacing ?? -0.5}px`,
                                   fontSize: `${headlineSize}px`,
                                   color: typographyForModal?.headline?.gradient?.enabled
                                     ? 'transparent'
@@ -2491,6 +2743,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.support?.weight || 400,
                                   fontStyle: typographyForModal?.support?.italic ? 'italic' : 'normal',
+                                  letterSpacing: `${typographyForModal?.support?.letterSpacing ?? 0}px`,
                                   fontSize: `${previewTextSizes.support}px`,
                                   color: typographyForModal?.support?.gradient?.enabled
                                     ? 'transparent'
@@ -2526,6 +2779,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   top: `${textPositions.cta.y}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.cta?.weight || 700,
+                                  letterSpacing: `${typographyForModal?.cta?.letterSpacing ?? 1}px`,
                                   fontSize: `${previewTextSizes.cta}px`,
                                   color: typographyForModal?.cta?.color || '#0a0b10',
                                   backgroundColor: typographyForModal?.cta?.gradient?.enabled
@@ -2894,6 +3148,7 @@ function getDefaultData(type: BlockType): any {
       fontFamily: 'Manrope',
       headline: {
         weight: '800', size: 56, color: '#ffffff',
+        letterSpacing: -0.5,
         box: { enabled: false, color: '#000000', opacity: 60 },
         shadow: { enabled: true, color: '#000000', opacity: 80 },
         stroke: { enabled: false, color: '#000000', width: 2 },
@@ -2903,6 +3158,7 @@ function getDefaultData(type: BlockType): any {
       },
       support: {
         weight: '400', size: 22, color: '#f5f5f5',
+        letterSpacing: 0,
         box: { enabled: false, color: '#000000', opacity: 50 },
         shadow: { enabled: true, color: '#000000', opacity: 70 },
         stroke: { enabled: false, color: '#000000', width: 1 },
@@ -2912,6 +3168,7 @@ function getDefaultData(type: BlockType): any {
       },
       cta:      {
         weight: '700', size: 14, color: '#0a0b10', bgColor: '#10b981',
+        letterSpacing: 1,
         gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
       },
       highlight:    { color: '#10b981', underline: true, shadow: true },
