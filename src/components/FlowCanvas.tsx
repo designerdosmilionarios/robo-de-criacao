@@ -1624,6 +1624,69 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           aria-label="Headline size"
                         />
                       </div>
+                      {/* Italic + Gradient para Headline */}
+                      <div className="flex items-center gap-1.5 text-[9px] text-gray-300">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={block.data.headline?.italic ?? false}
+                            onChange={(e) => {
+                              setBlocks((prev) => prev.map((b) =>
+                                b.id === block.id
+                                  ? { ...b, data: { ...b.data, headline: { ...b.data.headline, italic: e.target.checked } } }
+                                  : b
+                              ));
+                            }}
+                            className="rounded border-white/20 bg-black/40 text-orange-500"
+                          />
+                          <em className="text-[9px]">Italic</em>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={block.data.headline?.gradient?.enabled ?? false}
+                            onChange={(e) => {
+                              setBlocks((prev) => prev.map((b) =>
+                                b.id === block.id
+                                  ? { ...b, data: { ...b.data, headline: { ...b.data.headline, gradient: { ...(b.data.headline?.gradient || { from: '#fbbf24', to: '#10b981', angle: 90 }), enabled: e.target.checked } } } }
+                                  : b
+                              ));
+                            }}
+                            className="rounded border-white/20 bg-black/40 text-orange-500"
+                          />
+                          <span className="text-[9px]">Gradiente</span>
+                        </label>
+                        {block.data.headline?.gradient?.enabled && (
+                          <>
+                            <input
+                              type="color"
+                              value={block.data.headline?.gradient?.from || '#fbbf24'}
+                              onChange={(e) => {
+                                setBlocks((prev) => prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, headline: { ...b.data.headline, gradient: { ...b.data.headline.gradient, from: e.target.value } } } }
+                                    : b
+                                ));
+                              }}
+                              className="w-5 h-4 rounded border border-white/10 cursor-pointer"
+                              title="Cor inicial do gradiente"
+                            />
+                            <input
+                              type="color"
+                              value={block.data.headline?.gradient?.to || '#10b981'}
+                              onChange={(e) => {
+                                setBlocks((prev) => prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, headline: { ...b.data.headline, gradient: { ...b.data.headline.gradient, to: e.target.value } } } }
+                                    : b
+                                ));
+                              }}
+                              className="w-5 h-4 rounded border border-white/10 cursor-pointer"
+                              title="Cor final do gradiente"
+                            />
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* DESTAQUE */}
@@ -1678,6 +1741,67 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           aria-label="Support size"
                         />
                       </div>
+                      {/* Italic + Gradient para Destaque */}
+                      <div className="flex items-center gap-1.5 text-[9px] text-gray-300">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={block.data.support?.italic ?? false}
+                            onChange={(e) => {
+                              setBlocks((prev) => prev.map((b) =>
+                                b.id === block.id
+                                  ? { ...b, data: { ...b.data, support: { ...b.data.support, italic: e.target.checked } } }
+                                  : b
+                              ));
+                            }}
+                            className="rounded border-white/20 bg-black/40 text-orange-500"
+                          />
+                          <em className="text-[9px]">Italic</em>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={block.data.support?.gradient?.enabled ?? false}
+                            onChange={(e) => {
+                              setBlocks((prev) => prev.map((b) =>
+                                b.id === block.id
+                                  ? { ...b, data: { ...b.data, support: { ...b.data.support, gradient: { ...(b.data.support?.gradient || { from: '#10b981', to: '#34d399', angle: 90 }), enabled: e.target.checked } } } }
+                                  : b
+                              ));
+                            }}
+                            className="rounded border-white/20 bg-black/40 text-orange-500"
+                          />
+                          <span className="text-[9px]">Gradiente</span>
+                        </label>
+                        {block.data.support?.gradient?.enabled && (
+                          <>
+                            <input
+                              type="color"
+                              value={block.data.support?.gradient?.from || '#10b981'}
+                              onChange={(e) => {
+                                setBlocks((prev) => prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, support: { ...b.data.support, gradient: { ...b.data.support.gradient, from: e.target.value } } } }
+                                    : b
+                                ));
+                              }}
+                              className="w-5 h-4 rounded border border-white/10 cursor-pointer"
+                            />
+                            <input
+                              type="color"
+                              value={block.data.support?.gradient?.to || '#34d399'}
+                              onChange={(e) => {
+                                setBlocks((prev) => prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, support: { ...b.data.support, gradient: { ...b.data.support.gradient, to: e.target.value } } } }
+                                    : b
+                                ));
+                              }}
+                              className="w-5 h-4 rounded border border-white/10 cursor-pointer"
+                            />
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* CTA (opcional) */}
@@ -1727,6 +1851,49 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           }}
                           className="w-7 h-5 rounded border border-white/10 cursor-pointer"
                         />
+                        <label className="flex items-center gap-1 cursor-pointer ml-1">
+                          <input
+                            type="checkbox"
+                            checked={block.data.cta?.gradient?.enabled ?? false}
+                            onChange={(e) => {
+                              setBlocks((prev) => prev.map((b) =>
+                                b.id === block.id
+                                  ? { ...b, data: { ...b.data, cta: { ...b.data.cta, gradient: { ...(b.data.cta?.gradient || { from: '#10b981', to: '#34d399', angle: 90 }), enabled: e.target.checked } } } }
+                                  : b
+                              ));
+                            }}
+                            className="rounded border-white/20 bg-black/40 text-orange-500"
+                          />
+                          <span className="text-[9px]">Gradiente</span>
+                        </label>
+                        {block.data.cta?.gradient?.enabled && (
+                          <>
+                            <input
+                              type="color"
+                              value={block.data.cta?.gradient?.from || '#10b981'}
+                              onChange={(e) => {
+                                setBlocks((prev) => prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, cta: { ...b.data.cta, gradient: { ...b.data.cta.gradient, from: e.target.value } } } }
+                                    : b
+                                ));
+                              }}
+                              className="w-5 h-4 rounded border border-white/10 cursor-pointer"
+                            />
+                            <input
+                              type="color"
+                              value={block.data.cta?.gradient?.to || '#34d399'}
+                              onChange={(e) => {
+                                setBlocks((prev) => prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, cta: { ...b.data.cta, gradient: { ...b.data.cta.gradient, to: e.target.value } } } }
+                                    : b
+                                ));
+                              }}
+                              className="w-5 h-4 rounded border border-white/10 cursor-pointer"
+                            />
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -2280,8 +2447,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   maxWidth: `${layoutConfig.textWidth}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.headline?.weight || 800,
+                                  fontStyle: typographyForModal?.headline?.italic ? 'italic' : 'normal',
                                   fontSize: `${headlineSize}px`,
-                                  color: typographyForModal?.headline?.color || '#ffffff',
+                                  color: typographyForModal?.headline?.gradient?.enabled
+                                    ? 'transparent'
+                                    : typographyForModal?.headline?.color || '#ffffff',
                                   textAlign: layoutConfig.align,
                                   textWrap: 'balance',
                                   overflowWrap: 'normal',
@@ -2295,7 +2465,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   padding: typographyForModal?.headline?.box?.enabled ? '12px 16px' : '0',
                                   backgroundColor: typographyForModal?.headline?.box?.enabled
                                     ? `${typographyForModal.headline.box.color || '#000000'}${Math.round((typographyForModal.headline.box.opacity ?? 60) * 2.55).toString(16).padStart(2, '0')}`
-                                    : 'transparent',
+                                    : (typographyForModal?.headline?.gradient?.enabled
+                                        ? `linear-gradient(${typographyForModal.headline.gradient.angle ?? 90}deg, ${typographyForModal.headline.gradient.from || '#fbbf24'}, ${typographyForModal.headline.gradient.to || '#10b981'})`
+                                        : 'transparent'),
+                                  backgroundImage: typographyForModal?.headline?.gradient?.enabled
+                                    ? `linear-gradient(${typographyForModal.headline.gradient.angle ?? 90}deg, ${typographyForModal.headline.gradient.from || '#fbbf24'}, ${typographyForModal.headline.gradient.to || '#10b981'})`
+                                    : undefined,
+                                  WebkitBackgroundClip: typographyForModal?.headline?.gradient?.enabled ? 'text' : undefined,
+                                  backgroundClip: typographyForModal?.headline?.gradient?.enabled ? 'text' : undefined,
+                                  WebkitTextFillColor: typographyForModal?.headline?.gradient?.enabled ? 'transparent' : undefined,
                                   borderRadius: typographyForModal?.headline?.box?.enabled ? '8px' : '0',
                                 }}
                               >
@@ -2312,8 +2490,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   maxWidth: `${layoutConfig.textWidth}%`,
                                   fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
                                   fontWeight: typographyForModal?.support?.weight || 400,
+                                  fontStyle: typographyForModal?.support?.italic ? 'italic' : 'normal',
                                   fontSize: `${previewTextSizes.support}px`,
-                                  color: typographyForModal?.support?.color || '#f5f5f5',
+                                  color: typographyForModal?.support?.gradient?.enabled
+                                    ? 'transparent'
+                                    : typographyForModal?.support?.color || '#f5f5f5',
                                   textAlign: layoutConfig.align,
                                   textWrap: 'balance',
                                   textShadow: typographyForModal?.support?.shadow?.enabled !== false
@@ -2322,7 +2503,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   padding: typographyForModal?.support?.box?.enabled ? '8px 12px' : '0',
                                   backgroundColor: typographyForModal?.support?.box?.enabled
                                     ? `${typographyForModal.support.box.color || '#000000'}${Math.round((typographyForModal.support.box.opacity ?? 50) * 2.55).toString(16).padStart(2, '0')}`
-                                    : 'transparent',
+                                    : (typographyForModal?.support?.gradient?.enabled
+                                        ? `linear-gradient(${typographyForModal.support.gradient.angle ?? 90}deg, ${typographyForModal.support.gradient.from || '#10b981'}, ${typographyForModal.support.gradient.to || '#34d399'})`
+                                        : 'transparent'),
+                                  backgroundImage: typographyForModal?.support?.gradient?.enabled
+                                    ? `linear-gradient(${typographyForModal.support.gradient.angle ?? 90}deg, ${typographyForModal.support.gradient.from || '#10b981'}, ${typographyForModal.support.gradient.to || '#34d399'})`
+                                    : undefined,
+                                  WebkitBackgroundClip: typographyForModal?.support?.gradient?.enabled ? 'text' : undefined,
+                                  backgroundClip: typographyForModal?.support?.gradient?.enabled ? 'text' : undefined,
+                                  WebkitTextFillColor: typographyForModal?.support?.gradient?.enabled ? 'transparent' : undefined,
                                   borderRadius: typographyForModal?.support?.box?.enabled ? '6px' : '0',
                                 }}
                               >
@@ -2339,7 +2528,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                                   fontWeight: typographyForModal?.cta?.weight || 700,
                                   fontSize: `${previewTextSizes.cta}px`,
                                   color: typographyForModal?.cta?.color || '#0a0b10',
-                                  backgroundColor: typographyForModal?.cta?.bgColor || '#10b981',
+                                  backgroundColor: typographyForModal?.cta?.gradient?.enabled
+                                    ? `linear-gradient(${typographyForModal.cta.gradient.angle ?? 90}deg, ${typographyForModal.cta.gradient.from || '#10b981'}, ${typographyForModal.cta.gradient.to || '#34d399'})`
+                                    : typographyForModal?.cta?.bgColor || '#10b981',
+                                  backgroundImage: typographyForModal?.cta?.gradient?.enabled
+                                    ? `linear-gradient(${typographyForModal.cta.gradient.angle ?? 90}deg, ${typographyForModal.cta.gradient.from || '#10b981'}, ${typographyForModal.cta.gradient.to || '#34d399'})`
+                                    : undefined,
                                   whiteSpace: 'nowrap',
                                 }}
                               >
@@ -2703,15 +2897,23 @@ function getDefaultData(type: BlockType): any {
         box: { enabled: false, color: '#000000', opacity: 60 },
         shadow: { enabled: true, color: '#000000', opacity: 80 },
         stroke: { enabled: false, color: '#000000', width: 2 },
+        gradient: { enabled: false, from: '#fbbf24', to: '#10b981', angle: 90 },
+        italic: false,
         uppercase: true,
       },
       support: {
         weight: '400', size: 22, color: '#f5f5f5',
         box: { enabled: false, color: '#000000', opacity: 50 },
         shadow: { enabled: true, color: '#000000', opacity: 70 },
+        stroke: { enabled: false, color: '#000000', width: 1 },
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+        italic: false,
         uppercase: false,
       },
-      cta:      { weight: '700', size: 14, color: '#0a0b10', bgColor: '#10b981' },
+      cta:      {
+        weight: '700', size: 14, color: '#0a0b10', bgColor: '#10b981',
+        gradient: { enabled: false, from: '#10b981', to: '#34d399', angle: 90 },
+      },
       highlight:    { color: '#10b981', underline: true, shadow: true },
     };
     case 'copies': return {
