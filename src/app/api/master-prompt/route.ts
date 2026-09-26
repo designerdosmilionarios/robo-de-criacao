@@ -41,16 +41,17 @@ REGRAS:
 Exemplo de saida ideal:
 "Cinematic commercial product photography of a premium smartphone floating mid-air, soft volumetric lighting with cyan and gold rim lights, dark gradient background transitioning from deep navy to black, ultra-detailed 8k render, shallow depth of field, editorial magazine aesthetic, shot on Canon EOS R5 35mm f/1.4, dramatic reflections on glossy surface, single cohesive scene with negative space on the right for text overlay. Avoid: text, words, letters, watermarks, blurry, distorted anatomy, extra fingers, ugly artifacts."`;
 
-const COPY_SYSTEM_PROMPT = `Voce e um redator publicitario senior especializado em anuncios de performance.
+const buildCopySystemPrompt = (count: number) => `Voce e um redator publicitario senior especializado em anuncios de performance.
 
-Crie exatamente 4 variacoes curtas e distintas a partir do briefing recebido.
+Crie exatamente ${count} variacoes curtas e distintas a partir do briefing recebido.
 Cada variacao deve ocupar uma unica linha no formato: HEADLINE | DESTAQUE | CTA
 Escreva em portugues do Brasil, respeite o tom solicitado e evite promessas nao comprovadas.
 Nao use numeracao, marcadores, titulos, explicacoes ou markdown.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { brief, type = 'image', apiKey } = await req.json();
+    const { brief, type = 'image', apiKey, count: requestedCount } = await req.json();
+    const copyCount = Math.min(Math.max(Number.parseInt(String(requestedCount || 4), 10) || 4, 1), 12);
 
     const key = String(apiKey || process.env.OPENAI_API_KEY || '').replace(/[\s\r\n\t]+/g, '').trim();
 
@@ -81,14 +82,14 @@ export async function POST(req: NextRequest) {
 
     const userMessage =
       type === 'copy'
-        ? `Crie 4 variacoes de copy para este anuncio: ${brief}`
+        ? `Crie exatamente ${copyCount} variacoes de copy para este anuncio: ${brief}`
         : type === 'briefing'
         ? `Crie um prompt de imagem profissional para: ${brief}. Retorne APENAS o prompt em ingles.`
         : `Melhore este prompt de imagem publicitaria, adicionando detalhes tecnicos, iluminacao cinematica, composicao profissional e negative prompts. Prompt original: "${brief}". Retorne APENAS o prompt melhorado em ingles.`;
 
     const response = await callOpenAIChat(
       key,
-      type === 'copy' ? COPY_SYSTEM_PROMPT : SYSTEM_PROMPT,
+      type === 'copy' ? buildCopySystemPrompt(copyCount) : SYSTEM_PROMPT,
       userMessage
     );
     const data = await response.json();

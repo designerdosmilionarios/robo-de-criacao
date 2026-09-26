@@ -6,8 +6,19 @@ import { AuthUser, AuthSession } from '@/types';
 const STORAGE_KEY_USER = 'robo_auth_user';
 const STORAGE_KEY_SESSION = 'robo_auth_session';
 
-// Senha mestra inicial de contingência caso o usuário precise de acesso emergencial
-const MASTER_PIN = 'robo2026';
+function createSalt(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPin(pin: string, salt: string): Promise<string> {
+  const payload = new TextEncoder().encode(`${salt}:${pin.trim()}`);
+  const digest = await crypto.subtle.digest('SHA-256', payload);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+}
 
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -36,11 +47,14 @@ export function useAuth() {
   }, []);
 
   // Cadastrar novo usuário (primeiro acesso)
-  const register = useCallback((name: string, email: string, pin: string) => {
+  const register = useCallback(async (name: string, email: string, pin: string) => {
+    const pinSalt = createSalt();
+    const pinHash = await hashPin(pin, pinSalt);
     const newUser: AuthUser = {
       name: name.trim(),
       email: email.trim().toLowerCase(),
-      pin: pin.trim(),
+      pinHash,
+      pinSalt,
       role: 'Criador Pro',
       createdAt: new Date().toISOString(),
     };
@@ -64,42 +78,32 @@ export function useAuth() {
 
   // Login com PIN / Senha
   const login = useCallback(
-    (pin: string): { success: boolean; error?: string } => {
+    async (pin: string): Promise<{ success: boolean; error?: string }> => {
       const cleanPin = pin.trim();
-
-      // Permitir PIN mestre
-      if (cleanPin === MASTER_PIN) {
-        const userFallback = currentUser || {
-          name: 'Usuário Pro',
-          email: 'usuario@robostudio.pro',
-          pin: MASTER_PIN,
-          role: 'Administrador',
-          createdAt: new Date().toISOString(),
-        };
-
-        const newSession: AuthSession = {
-          isLoggedIn: true,
-          user: {
-            name: userFallback.name,
-            email: userFallback.email,
-          },
-          loggedInAt: new Date().toISOString(),
-        };
-
-        localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(newSession));
-        if (!currentUser) {
-          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userFallback));
-          setCurrentUser(userFallback);
-        }
-        setSession(newSession);
-        return { success: true };
-      }
 
       if (!currentUser) {
         return { success: false, error: 'Nenhum usuário cadastrado neste dispositivo.' };
       }
 
-      if (currentUser.pin === cleanPin) {
+      const matchesCurrentHash =
+        !!currentUser.pinHash &&
+        !!currentUser.pinSalt &&
+        (await hashPin(cleanPin, currentUser.pinSalt)) === currentUser.pinHash;
+      const matchesLegacyPin = !!currentUser.pin && currentUser.pin === cleanPin;
+
+      if (matchesCurrentHash || matchesLegacyPin) {
+        // Migra perfis antigos que ainda guardavam o PIN em texto puro.
+        if (matchesLegacyPin) {
+          const pinSalt = createSalt();
+          const migratedUser: AuthUser = {
+            ...currentUser,
+            pin: undefined,
+            pinSalt,
+            pinHash: await hashPin(cleanPin, pinSalt),
+          };
+          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(migratedUser));
+          setCurrentUser(migratedUser);
+        }
         const newSession: AuthSession = {
           isLoggedIn: true,
           user: {

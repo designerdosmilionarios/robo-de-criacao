@@ -409,9 +409,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   // Download em lote (ZIP) de todos os criativos do modal
   const handleDownloadZip = async () => {
     if (!outputModal || !Array.isArray(outputModal.output)) return;
-    const images: string[] = outputModal.output.filter(
-      (v: any) => typeof v === 'string' && v.startsWith('data:image')
-    );
+    const images: string[] = outputModal.output
+      .map((value: any) => (typeof value === 'string' ? value : value?.imageUrl))
+      .filter((value: unknown): value is string =>
+        typeof value === 'string' && value.startsWith('data:image')
+      );
     if (images.length === 0) {
       alert('Nenhuma imagem disponível para empacotar em ZIP.');
       return;
@@ -478,19 +480,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           const imageUrl = typeof item === 'string' ? item : item?.imageUrl;
           if (!imageUrl || !imageUrl.startsWith('data:image')) continue;
           counter += 1;
-          const preview = document.getElementById(`flow-creative-preview-${i}`);
-          let finalDataUrl = imageUrl;
-          if (preview) {
-            try {
-              finalDataUrl = await toPng(preview, {
-                pixelRatio: 1,
-                canvasWidth: 1080,
-                canvasHeight: 1080,
-                cacheBust: true,
-              });
-            } catch {}
-          }
-          const base64 = finalDataUrl.split(',')[1];
+          // Os previews pertencem apenas ao modal atualmente aberto. Usá-los aqui
+          // repetia a mesma imagem para blocos diferentes. O ZIP global exporta
+          // cada resultado original do respectivo bloco, sem duplicações.
+          const base64 = imageUrl.split(',')[1];
           zip.file(`criativo-${String(counter).padStart(2, '0')}.png`, base64, { base64: true });
         }
       }
@@ -575,9 +568,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
     // Para image-output individual: descobrir o índice deste bloco entre todos os image-output.
     // Isso permite emparelhar Copy[i] <-> Image[i] quando há 9 blocos Gerar Imagem.
-    const imageOutputTypes: BlockType[] = ['image-output', 'variations-output', 'batch-output'];
-    const sortedImageOutputs = blocks.filter((b) => imageOutputTypes.includes(b.type));
+    const sortedImageOutputs = blocks.filter((b) => b.type === 'image-output');
     const myImageIndex = sortedImageOutputs.findIndex((b) => b.id === blockId);
+    const automaticCopy =
+      block.type === 'image-output' && myImageIndex >= 0
+        ? copiesList[myImageIndex] || null
+        : null;
 
     const requiresBriefing =
       block.type === 'copy-output' ||
@@ -589,7 +585,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     const hasBlockVisualPrompt =
       String(block.data?.visualPrompt || '').trim().length > 0;
     const hasAnyCopyVisualPrompt =
-      (block.type === 'image-output' && myImageIndex >= 0 && copiesList[myImageIndex]?.visualPrompt?.trim()) ||
+      (block.type === 'image-output' && automaticCopy?.visualPrompt?.trim()) ||
       (block.type === 'batch-output' && copiesList.some((c) => c?.visualPrompt?.trim()));
     const hasImageOutputsWithVisualPrompts =
       block.type === 'image-output' && hasBlockVisualPrompt;
@@ -647,7 +643,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         const myPairedCopyId = block.data?.pairedCopyId;
         const copyForSelf = myPairedCopyId
           ? copiesList.find((c) => c?.id === myPairedCopyId) ?? copiesList[0]
-          : null;
+          : automaticCopy;
 
         // Gerar imagens em loop
         const items: Array<{ imageUrl: string; copy?: { headline: string; support: string; cta?: string } }> = [];
@@ -711,12 +707,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           );
         }
 
-        if (block.type === 'image-output' && items[0]) {
-          setOutputModal({ blockId, output: items[0].imageUrl });
-        } else {
-          // Para batch/variations, passamos objetos com imageUrl + copy
-          setOutputModal({ blockId, output: items });
-        }
+        // O modal sempre recebe os objetos completos para manter o pareamento
+        // Copy -> Imagem, inclusive quando existe apenas uma imagem.
+        setOutputModal({ blockId, output: items });
       }
     } catch (err: any) {
       alert(`Erro: ${err.message}`);
@@ -1866,7 +1859,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                       <button
                         onClick={(event) => {
                           event.stopPropagation();
-                          setOutputModal({ blockId: block.id, output: block.output });
+                          const pairedCopies = Array.isArray(block.data?.pairedCopies)
+                            ? block.data.pairedCopies
+                            : [];
+                          const restoredOutput = Array.isArray(block.output)
+                            ? block.output.map((out: any, index: number) => {
+                                const imageUrl = typeof out === 'string' ? out : out?.imageUrl;
+                                const copy = out?.copy || pairedCopies[index] || null;
+                                return imageUrl && copy ? { imageUrl, copy } : out;
+                              })
+                            : block.output;
+                          setOutputModal({ blockId: block.id, output: restoredOutput });
                         }}
                         className="m-1.5 w-[calc(100%-0.75rem)] rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-bold text-white hover:bg-white/10"
                       >
@@ -2494,6 +2497,7 @@ async function generateCopyVariations(
       brief: briefing,
       type: 'copy',
       apiKey,
+      count,
     }),
   });
   const data = await res.json();

@@ -10,22 +10,30 @@ export function usePersistedState<T>(
   defaultValue: T,
   debounceMs = 500
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [state, setState] = useState<T>(() => {
-    if (typeof window === 'undefined') return defaultValue;
+  // Use o mesmo valor no servidor e na primeira renderização do navegador.
+  // O conteúdo persistido é carregado depois da hidratação para evitar diferenças
+  // entre o HTML inicial do Next.js e o React no cliente.
+  const [state, setState] = useState<T>(defaultValue);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(`studio_${key}`);
       if (saved) {
-        return JSON.parse(saved) as T;
+        setState(JSON.parse(saved) as T);
       }
     } catch (e) {
       console.warn(`Erro ao carregar ${key} do localStorage:`, e);
+    } finally {
+      setIsHydrated(true);
     }
-    return defaultValue;
-  });
+  }, [key]);
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (!isHydrated) return;
+
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       try {
@@ -38,7 +46,7 @@ export function usePersistedState<T>(
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [key, state, debounceMs]);
+  }, [key, state, debounceMs, isHydrated]);
 
   return [state, setState];
 }

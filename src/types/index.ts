@@ -245,7 +245,10 @@ export interface SavedBatchAdsData {
 export interface AuthUser {
   name: string;
   email: string;
-  pin: string;
+  /** Legado: removido automaticamente depois do primeiro login bem-sucedido. */
+  pin?: string;
+  pinHash?: string;
+  pinSalt?: string;
   role?: string;
   createdAt: string;
 }

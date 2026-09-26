@@ -18,8 +18,8 @@ import { AuthUser } from '@/types';
 interface AuthScreenProps {
   hasRegisteredUser: boolean;
   currentUser: AuthUser | null;
-  onLogin: (pin: string) => { success: boolean; error?: string };
-  onRegister: (name: string, email: string, pin: string) => { success: boolean };
+  onLogin: (pin: string) => Promise<{ success: boolean; error?: string }>;
+  onRegister: (name: string, email: string, pin: string) => Promise<{ success: boolean }>;
   onResetAccount: () => void;
 }
 
@@ -45,7 +45,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   // Erros e avisos
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -54,13 +54,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    const res = onLogin(loginPin);
+    const res = await onLogin(loginPin);
     if (!res.success) {
       setErrorMsg(res.error || 'Senha incorreta.');
     }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -81,7 +81,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    onRegister(regName, regEmail, regPin);
+    await onRegister(regName, regEmail, regPin);
   };
 
   return (
@@ -285,14 +285,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           {/* Badge de Privacidade */}
           <div className="mt-6 pt-5 border-t border-white/10 flex items-center justify-center gap-2 text-[11px] text-gray-400">
             <ShieldCheck size={14} className="text-emerald-400" />
-            <span>Seus dados e chaves ficam 100% seguros neste dispositivo</span>
+            <span>Bloqueio local deste navegador — não substitui autenticação de servidor</span>
           </div>
         </div>
 
-        {/* Rodapé com Dica de Contingência */}
         <div className="text-center mt-6 text-xs text-gray-500 flex items-center justify-center gap-1.5">
           <HelpCircle size={13} />
-          <span>Primeiro acesso rápido? Senha mestra: <code className="text-brand-400">robo2026</code></span>
+          <span>Esqueceu o PIN? Use “Trocar / Resetar” para criar um novo perfil local.</span>
         </div>
       </div>
     </div>

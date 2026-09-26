@@ -63,10 +63,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
               <ShieldCheck size={16} />
-              <span>Privacidade Total & Armazenamento Local</span>
+              <span>Armazenamento local da chave</span>
             </div>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Sua chave fica gravada apenas no seu navegador. Nada é enviado para servidores de terceiros.
+              Sua chave fica gravada neste navegador. Ao gerar conteúdo, ela é enviada à rota interna do Robô Studio, que encaminha a solicitação à OpenAI.
             </p>
           </div>
 

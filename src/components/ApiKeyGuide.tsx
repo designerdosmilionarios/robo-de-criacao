@@ -31,7 +31,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
 }) => {
   const [inputKey, setInputKey] = useState(apiKey);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  const [testingStatus, setTestingStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid' | 'no-quota'>('idle');
+  const [testingStatus, setTestingStatus] = useState<'idle' | 'testing' | 'valid' | 'invalid'>('idle');
   const [testMessage, setTestMessage] = useState<string>('');
   const [saveFeedback, setSaveFeedback] = useState(false);
 
@@ -65,39 +65,32 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
     setTestMessage('Conectando à OpenAI para verificar autenticação e modelos...');
 
     try {
-      // Teste leve consultando a lista de modelos da OpenAI
-      const res = await fetch('https://api.openai.com/v1/models', {
-        method: 'GET',
+      const res = await fetch('/api/validate-openai-key', {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${keyToTest}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ apiKey: keyToTest }),
       });
+
+      const result = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setTestingStatus('valid');
-        setTestMessage('✨ Chave 100% válida e conectada com sucesso à OpenAI! Pronta para criar imagens e roteiros.');
-        // Salva automaticamente se estiver válida
+        setTestMessage(result.message || 'Chave autenticada pela OpenAI. Saldo e acesso aos modelos de imagem são verificados somente durante a geração.');
         onSaveApiKey(keyToTest);
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        const code = errorData?.error?.code;
-        const msg = errorData?.error?.message || '';
-
         if (res.status === 401) {
           setTestingStatus('invalid');
           setTestMessage('Chave rejeitada pela OpenAI (401 Unauthorized). Verifique se copiou a chave inteira sem espaços.');
-        } else if (res.status === 429 || code === 'insufficient_quota') {
-          setTestingStatus('no-quota');
-          setTestMessage('Chave autêntica, porém sem créditos pré-pagos disponíveis (Saldo $0). É necessário recarregar a partir de $5 na aba Billing.');
-          onSaveApiKey(keyToTest);
         } else {
           setTestingStatus('invalid');
-          setTestMessage(`Erro ${res.status}: ${msg || 'Não foi possível validar a chave.'}`);
+          setTestMessage(result.message || `Erro ${res.status}: não foi possível validar a chave.`);
         }
       }
     } catch (err: any) {
       setTestingStatus('invalid');
-      setTestMessage(`Erro de rede ao conectar com api.openai.com: ${err.message || 'Verifique sua conexão de internet.'}`);
+      setTestMessage(`Erro de rede ao validar a chave: ${err.message || 'Verifique sua conexão de internet.'}`);
     }
   };
 
@@ -144,7 +137,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
           Já tem uma chave? Conecte ou Teste aqui
         </h3>
         <p className="text-xs text-gray-400 mb-4">
-          Cole sua chave da OpenAI e clique em testar. Ela ficará salva no seu navegador com segurança total.
+          Cole sua chave da OpenAI e clique em testar. Ela ficará salva localmente neste navegador; use apenas em um dispositivo confiável.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -192,8 +185,6 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
             className={`mt-4 p-4 rounded-2xl border text-xs leading-relaxed flex items-start gap-3 animate-in fade-in ${
               testingStatus === 'valid'
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                : testingStatus === 'no-quota'
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
                 : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
             }`}
           >
@@ -206,23 +197,9 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
               <span className="font-bold block">
                 {testingStatus === 'valid'
                   ? 'Conexão Aprovada!'
-                  : testingStatus === 'no-quota'
-                  ? 'Chave Válida, mas Sem Créditos (Saldo $0)'
                   : 'Falha na Validação'}
               </span>
               <span>{testMessage}</span>
-              {testingStatus === 'no-quota' && (
-                <div className="pt-2">
-                  <a
-                    href="https://platform.openai.com/settings/organization/billing/overview"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 text-dark-900 font-extrabold text-[11px]"
-                  >
-                    Adicionar $5 na OpenAI agora <ExternalLink size={12} />
-                  </a>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -237,7 +214,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
               ⚠️ ATENÇÃO: ChatGPT Plus ($20/mês) NÃO é a mesma coisa que a API
             </h4>
             <p className="leading-relaxed text-amber-200/90">
-              Muitos usuários assinam o ChatGPT Plus na web (Opus 4.8) e acham que podem usar no Robô Studio.
+              Muitos usuários assinam o ChatGPT Plus na web e acham que podem usar a mesma assinatura no Robô Studio.
               <strong> A API da OpenAI funciona em uma plataforma separada (platform.openai.com).</strong>
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -282,7 +259,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
               </a>
             </div>
             <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
-              Entre em <strong>platform.openai.com</strong> e faça login com a mesma conta que você já usa no Opus 4.8, Microsoft ou crie uma nova conta gratuita.
+              Entre em <strong>platform.openai.com</strong> e faça login com sua conta OpenAI, Google, Microsoft ou crie uma nova conta.
             </p>
           </div>
         </div>
@@ -377,7 +354,7 @@ export const ApiKeyGuide: React.FC<ApiKeyGuideProps> = ({
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1.5">
             <h4 className="text-xs font-bold text-white">Minha chave fica salva em algum servidor?</h4>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Não! A sua chave de API fica armazenada exclusivamente no armazenamento local (localStorage) do seu navegador. Ela é enviada diretamente para a OpenAI no momento da geração.
+              A chave fica armazenada no armazenamento local (localStorage) deste navegador. Durante uma geração, ela é enviada à rota interna do Robô Studio, que encaminha a solicitação à OpenAI. Use a ferramenta somente em uma instalação confiável.
             </p>
           </div>
 
