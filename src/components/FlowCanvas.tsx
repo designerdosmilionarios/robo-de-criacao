@@ -125,7 +125,8 @@ const getAdaptiveHeadlineSize = (text: string, configuredSize: number, multiple:
 function buildCreativeImagePrompt(
   visualBrief: string,
   copy: { headline?: string; support?: string; cta?: string } | null,
-  layout: CreativeLayout
+  layout: CreativeLayout,
+  preserveVisualDirection = false
 ) {
   const headline = cleanCopyField(copy?.headline);
   const support = cleanCopyField(copy?.support);
@@ -134,8 +135,12 @@ function buildCreativeImagePrompt(
 
   return [
     visualBrief,
-    message ? `Campaign message and strategic meaning to visualize: "${message}".` : '',
-    'Translate the offer into a specific, believable visual scene tied directly to the audience, problem and desired outcome. Prefer a human situation, product detail, environment or distinctive visual metaphor that could only belong to this brief.',
+    preserveVisualDirection
+      ? 'Treat every subject, setting, object, action and art-direction detail above as mandatory. Do not replace or reinterpret them based on the campaign copy.'
+      : 'Translate the offer into a specific, believable visual scene tied directly to the audience, problem and desired outcome. Prefer a human situation, product detail, environment or distinctive visual metaphor that could only belong to this brief.',
+    message
+      ? `Secondary campaign context only: "${message}". Use it to refine mood and relevance, never to change the explicitly requested subject or setting.`
+      : '',
     layoutDirection,
     'The reserved typography area must contain no faces, hands, products, important objects or bright highlights.',
     'Create only the photographic or illustrated background. Do not render the campaign headline, CTA, typography, labels, interface screens, logos or any readable text inside the image.',
@@ -759,7 +764,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           const directedVisualPrompt = buildCreativeImagePrompt(
             effectiveBriefing,
             copyForThis,
-            creativeLayout
+            creativeLayout,
+            Boolean(blockVisualPrompt || copyVisualPrompt)
           );
           const url = await generateImage(directedVisualPrompt, style, logo, apiKey, references, expertImage, expertPreserve);
           if (url) {
@@ -2291,7 +2297,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           </div>
                           {pairedCopy && (
                             <div className="bg-yellow-500/10 border-t border-yellow-500/30 px-3 py-1.5 text-[10px] text-yellow-200 font-bold">
-                              📝 Copy {i + 1}: {pairedCopy.headline || '(sem headline)'} · {pairedCopy.cta || '(sem CTA)'}
+                              📝 Copy {i + 1}: {cleanCopyField(pairedCopy.headline) || '(sem headline)'}
+                              {cleanCopyField(pairedCopy.cta) ? ` · ${cleanCopyField(pairedCopy.cta)}` : ''}
                             </div>
                           )}
                           <button
