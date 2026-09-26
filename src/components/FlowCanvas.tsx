@@ -32,6 +32,7 @@ export type BlockType =
   | 'expert'
   | 'reference'
   | 'style'
+  | 'typography'
   | 'copies'
   | 'copy-output'
   | 'image-output'
@@ -106,6 +107,13 @@ const BLOCK_CONFIG: Record<BlockType, {
     bgColor: 'bg-pink-500/5',
     description: 'Tom, paleta e estilo',
   },
+  typography: {
+    icon: Type,
+    color: 'text-orange-400',
+    borderColor: 'border-orange-500/40 hover:border-orange-500',
+    bgColor: 'bg-orange-500/5',
+    description: 'Tipografia (fonte, pesos, cores)',
+  },
   'copy-output': {
     icon: Hash,
     color: 'text-amber-400',
@@ -164,9 +172,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [textPositions, setTextPositions] = useState<TextPositions>(() => {
     if (typeof window === 'undefined') {
       return {
-        headline: { x: 8, y: 70 },
-        support: { x: 8, y: 82 },
-        cta: { x: 8, y: 92 },
+        headline: { x: 8, y: 15 },
+        support: { x: 8, y: 75 },
+        cta: { x: 8, y: 90 },
       };
     }
     try {
@@ -174,9 +182,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
-      headline: { x: 8, y: 70 },
-      support: { x: 8, y: 82 },
-      cta: { x: 8, y: 92 },
+      headline: { x: 8, y: 15 },
+      support: { x: 8, y: 75 },
+      cta: { x: 8, y: 90 },
     };
   });
 
@@ -189,11 +197,44 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
   const resetTextPositions = () => {
     setTextPositions({
-      headline: { x: 8, y: 70 },
-      support: { x: 8, y: 82 },
-      cta: { x: 8, y: 92 },
+      headline: { x: 8, y: 15 },
+      support: { x: 8, y: 75 },
+      cta: { x: 8, y: 90 },
     });
   };
+
+  // Posicao do logo (X/Y em %) e tamanho (% da largura)
+  const [logoPosition, setLogoPosition] = useState<{ x: number; y: number; size: number }>(() => {
+    if (typeof window === 'undefined') return { x: 8, y: 8, size: 18 };
+    try {
+      const saved = localStorage.getItem('flow_logo_position');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { x: 8, y: 8, size: 18 };
+  });
+
+  // Persistir posicao do logo
+  useEffect(() => {
+    try {
+      localStorage.setItem('flow_logo_position', JSON.stringify(logoPosition));
+    } catch {}
+  }, [logoPosition]);
+
+  const resetLogoPosition = () => setLogoPosition({ x: 8, y: 8, size: 18 });
+
+  // Extrair URL do logo a partir dos blocos conectados ao outputModal
+  const getLogoUrlForOutput = (): string | null => {
+    if (!outputModal) return null;
+    const outputBlock = blocks.find((b) => b.id === outputModal.blockId);
+    if (!outputBlock) return null;
+    const inputBlocks = connections
+      .filter((c) => c.to === outputBlock.id)
+      .map((c) => blocks.find((b) => b.id === c.from))
+      .filter(Boolean) as FlowBlock[];
+    return inputBlocks.find((b) => b.type === 'logo')?.data?.imageUrl || null;
+  };
+  const logoUrlForModal = getLogoUrlForOutput();
+
   const canvasRef = useRef<HTMLDivElement>(null);
   const referencesInputRef = useRef<HTMLInputElement>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -400,6 +441,110 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     }
   };
 
+  // Executa TODOS os blocos Gerar Imagem em sequencia (um por um).
+  // Util quando o usuario tem 9 blocos image-output, cada um com seu prompt visual proprio.
+  const handleExecuteAllImageOutputs = async () => {
+    const imageOutputIds = blocks
+      .filter((b) => b.type === 'image-output')
+      .map((b) => b.id);
+    if (imageOutputIds.length === 0) {
+      alert('Adicione pelo menos um bloco "Gerar Imagem" antes de executar todos.');
+      return;
+    }
+    for (const id of imageOutputIds) {
+      await handleGenerate(id);
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  };
+
+  // Empacota em um unico ZIP todas as imagens geradas por TODOS os blocos image-output.
+  const handleDownloadAllResultsZip = async () => {
+    const imageBlocksWithOutput = blocks.filter(
+      (b) => b.type === 'image-output' && Array.isArray(b.output) && (b.output as any[]).length > 0
+    );
+    if (imageBlocksWithOutput.length === 0) {
+      alert('Nenhum bloco "Gerar Imagem" gerou imagens ainda.');
+      return;
+    }
+
+    setDownloadingZip(true);
+    try {
+      const zip = new JSZip();
+      let counter = 0;
+      for (const block of imageBlocksWithOutput) {
+        const output = block.output as any[];
+        for (let i = 0; i < output.length; i++) {
+          const item = output[i];
+          const imageUrl = typeof item === 'string' ? item : item?.imageUrl;
+          if (!imageUrl || !imageUrl.startsWith('data:image')) continue;
+          counter += 1;
+          const preview = document.getElementById(`flow-creative-preview-${i}`);
+          let finalDataUrl = imageUrl;
+          if (preview) {
+            try {
+              finalDataUrl = await toPng(preview, {
+                pixelRatio: 1,
+                canvasWidth: 1080,
+                canvasHeight: 1080,
+                cacheBust: true,
+              });
+            } catch {}
+          }
+          const base64 = finalDataUrl.split(',')[1];
+          zip.file(`criativo-${String(counter).padStart(2, '0')}.png`, base64, { base64: true });
+        }
+      }
+      if (counter === 0) {
+        alert('Nenhuma imagem encontrada para empacotar.');
+        return;
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `esteira-individual-${Date.now()}.zip`);
+    } catch (err: any) {
+      alert(`Erro ao gerar ZIP: ${err.message}`);
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
+  // Pegar o bloco de Tipografia conectado a um bloco output (via conexoes)
+  const getTypographyForOutput = (outputBlockId: string) => {
+    const inputBlocks = connections
+      .filter((c) => c.to === outputBlockId)
+      .map((c) => blocks.find((b) => b.id === c.from))
+      .filter(Boolean) as FlowBlock[];
+    return inputBlocks.find((b) => b.type === 'typography')?.data;
+  };
+
+  // Renderizar texto com destaque de *palavras* entre asteriscos
+  const renderHeadlineWithHighlight = (text: string, highlight: any) => {
+    if (!text) return null;
+    const parts = text.split(/(\*[^*]+\*)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('*') && part.endsWith('*')) {
+        const word = part.slice(1, -1);
+        return (
+          <span
+            key={idx}
+            style={{
+              color: highlight?.color || '#fbbf24',
+              textDecoration: highlight?.underline ? 'underline' : 'none',
+              textDecorationColor: highlight?.color || '#fbbf24',
+              textUnderlineOffset: '4px',
+              fontWeight: 'inherit',
+            }}
+          >
+            {word}
+          </span>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
+  };
+
+  // Tipografia aplicada ao modal atual
+  const typographyForModal = outputModal ? getTypographyForOutput(outputModal.blockId) : null;
+
   // Gerar saida de um bloco (executa o flow)
   const handleGenerate = async (blockId: string) => {
     const block = blocks.find((b) => b.id === blockId);
@@ -423,10 +568,16 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
     // Copys manuais conectadas (para emparelhar Copy[i] -> Imagem[i])
     const copiesBlock = inputBlocks.find((b) => b.type === 'copies');
-    const copiesList: Array<{ headline: string; support: string; cta: string }> =
+    const copiesList: Array<{ id: string; headline: string; support: string; cta?: string; visualPrompt?: string }> =
       (copiesBlock?.data?.items || []).filter(
-        (c: any) => c && (c.headline?.trim() || c.support?.trim() || c.cta?.trim())
+        (c: any) => c && (c.headline?.trim() || c.support?.trim() || c.cta?.trim() || c.visualPrompt?.trim())
       );
+
+    // Para image-output individual: descobrir o índice deste bloco entre todos os image-output.
+    // Isso permite emparelhar Copy[i] <-> Image[i] quando há 9 blocos Gerar Imagem.
+    const imageOutputTypes: BlockType[] = ['image-output', 'variations-output', 'batch-output'];
+    const sortedImageOutputs = blocks.filter((b) => imageOutputTypes.includes(b.type));
+    const myImageIndex = sortedImageOutputs.findIndex((b) => b.id === blockId);
 
     const requiresBriefing =
       block.type === 'copy-output' ||
@@ -434,8 +585,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       block.type === 'variations-output' ||
       block.type === 'batch-output';
 
-    if (!briefing && requiresBriefing) {
-      alert('Conecte um bloco "Briefing" antes deste bloco de output. Arraste da bolinha direita do Briefing para a esquerda deste bloco.');
+    // Para image-output e batch-output: se houver prompt visual (no proprio bloco OU em qualquer copy emparelhada), nao exige briefing global
+    const hasBlockVisualPrompt =
+      String(block.data?.visualPrompt || '').trim().length > 0;
+    const hasAnyCopyVisualPrompt =
+      (block.type === 'image-output' && myImageIndex >= 0 && copiesList[myImageIndex]?.visualPrompt?.trim()) ||
+      (block.type === 'batch-output' && copiesList.some((c) => c?.visualPrompt?.trim()));
+    const hasImageOutputsWithVisualPrompts =
+      block.type === 'image-output' && hasBlockVisualPrompt;
+
+    if (!briefing && requiresBriefing && !hasImageOutputsWithVisualPrompts && !hasAnyCopyVisualPrompt) {
+      alert('Conecte um bloco "Briefing" ou preencha o campo "Prompt Visual deste bloco" (ou o "Prompt Visual" da copy) antes de gerar. Arraste da bolinha direita do Briefing para a esquerda deste bloco OU cole o prompt diretamente no bloco verde.');
       return;
     }
 
@@ -462,25 +622,65 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         block.type === 'variations-output' ||
         block.type === 'batch-output'
       ) {
+        // Lote N (batch-output) com modo "Prompts Individuais":
+        // Detecta blocos image-output conectados e usa o prompt visual de cada um.
+        const connectedImageOutputs = block.type === 'batch-output'
+          ? inputBlocks.filter((b) => b.type === 'image-output')
+          : [];
+        const useIndividual = block.type === 'batch-output'
+          && (block.data?.useIndividualPrompts ?? true)
+          && connectedImageOutputs.length > 0;
+
         let count = 1;
         if (block.type === 'image-output') count = 1;
         else if (block.type === 'variations-output') count = 4;
         else if (block.type === 'batch-output') {
           count = Math.min(Math.max(parseInt(String(block.data.count)) || 9, 1), 12);
+          if (useIndividual) {
+            count = Math.min(count, connectedImageOutputs.length);
+          } else if (copiesList.length > 0) {
+            count = Math.min(count, copiesList.length);
+          }
         }
 
-        // Se houver copies manuais conectadas, limitar count ao tamanho da lista
-        if (copiesList.length > 0 && block.type === 'batch-output') {
-          count = Math.min(count, copiesList.length);
-        }
+        // Determinar o briefing deste bloco (seja image-output individual OU slot do batch)
+        const myPairedCopyId = block.data?.pairedCopyId;
+        const copyForSelf = myPairedCopyId
+          ? copiesList.find((c) => c?.id === myPairedCopyId) ?? copiesList[0]
+          : null;
 
         // Gerar imagens em loop
-        const items: Array<{ imageUrl: string; copy?: { headline: string; support: string; cta: string } }> = [];
+        const items: Array<{ imageUrl: string; copy?: { headline: string; support: string; cta?: string } }> = [];
         for (let i = 0; i < count; i++) {
           setGenerateProgress({ current: i + 1, total: count });
-          const url = await generateImage(briefing, style, logo, apiKey, references, expertImage, expertPreserve);
+
+          // Para batch com prompts individuais: usar o prompt visual do image-output conectado no slot i
+          let sourceBlock = block;
+          let copyForThis: any = null;
+          if (useIndividual && connectedImageOutputs[i]) {
+            sourceBlock = connectedImageOutputs[i];
+            const ipPairedId = sourceBlock.data?.pairedCopyId;
+            copyForThis = ipPairedId
+              ? copiesList.find((c) => c?.id === ipPairedId) ?? copiesList[i]
+              : copiesList[i] || null;
+          } else {
+            copyForThis = copyForSelf || copiesList[i] || null;
+          }
+
+          // Hierarquia de prompts:
+          // 1) Prompt visual do bloco de origem (do image-output conectado OU deste bloco)
+          // 2) Prompt visual da copy pareada
+          // 3) Briefing global
+          const blockVisualPrompt = String(sourceBlock.data?.visualPrompt || '').trim();
+          const copyVisualPrompt = String(copyForThis?.visualPrompt || '').trim();
+          const effectiveBriefing = blockVisualPrompt || copyVisualPrompt || briefing;
+
+          if (!effectiveBriefing) {
+            throw new Error(`Slot ${i + 1} sem briefing nem prompt visual. Preencha o campo "Prompt Visual" do bloco Gerar Imagem ou conecte um bloco Briefing.`);
+          }
+
+          const url = await generateImage(effectiveBriefing, style, logo, apiKey, references, expertImage, expertPreserve);
           if (url) {
-            const copyForThis = copiesList[i] || null;
             items.push(copyForThis ? { imageUrl: url, copy: copyForThis } : { imageUrl: url });
           }
         }
@@ -592,6 +792,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           >
             <Palette size={12} /> Estilo
           </button>
+          <button
+            onClick={() => handleCreateBlock('typography')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 border border-orange-500/30"
+            title="Família tipográfica (Manrope padrão), pesos, tamanhos e cores de headline/destaque/destaque de palavra-chave"
+          >
+            <Type size={12} /> Tipografia
+          </button>
           <div className="w-px h-6 bg-white/10 mx-1" />
           <button
             onClick={() => handleCreateBlock('copy-output')}
@@ -617,6 +824,23 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             title="Lote de 1 a 12 criativos gerados a partir do mesmo briefing"
           >
             <Zap size={12} /> Lote N
+          </button>
+          <div className="w-px h-6 bg-white/10 mx-1" />
+          <button
+            onClick={handleExecuteAllImageOutputs}
+            disabled={!!generating || blocks.filter((b) => b.type === 'image-output').length === 0}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-300 hover:from-emerald-500/30 hover:to-cyan-500/30 border border-emerald-500/40 disabled:opacity-50"
+            title="Executa todos os blocos Gerar Imagem em sequência (cada um usa a copy e prompt visual correspondentes)"
+          >
+            <Play size={12} /> Executar Todos
+          </button>
+          <button
+            onClick={handleDownloadAllResultsZip}
+            disabled={downloadingZip || blocks.filter((b) => b.type === 'image-output' && Array.isArray(b.output) && b.output.length > 0).length === 0}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 disabled:opacity-50"
+            title="Empacota em um ZIP todas as imagens geradas por todos os blocos Gerar Imagem"
+          >
+            <Archive size={12} /> ZIP Todos
           </button>
         </div>
       </div>
@@ -1022,8 +1246,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                           />
                           <input
                             type="text"
-                            placeholder="CTA"
-                            value={item.cta}
+                            placeholder="CTA (opcional)"
+                            value={item.cta || ''}
                             onChange={(e) => {
                               const v = e.target.value;
                               setBlocks((prev) =>
@@ -1044,6 +1268,35 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             }}
                             className="w-full px-1.5 py-1 rounded bg-black/40 border border-white/10 text-white text-[10px] focus:border-yellow-400 focus:outline-none"
                           />
+                          <div className="pt-0.5">
+                            <label className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider text-fuchsia-400">
+                              <Sparkles size={8} /> Prompt Visual (sobrescreve briefing)
+                            </label>
+                            <textarea
+                              rows={2}
+                              placeholder="Descreva a cena deste criativo. Ex: smartphone com analytics mostrando engajamento alto vs agendamentos zerados..."
+                              value={item.visualPrompt || ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setBlocks((prev) =>
+                                  prev.map((b) =>
+                                    b.id === block.id
+                                      ? {
+                                          ...b,
+                                          data: {
+                                            ...b.data,
+                                            items: (b.data.items || []).map((it: any) =>
+                                              it.id === item.id ? { ...it, visualPrompt: v } : it
+                                            ),
+                                          },
+                                        }
+                                      : b
+                                  )
+                                );
+                              }}
+                              className="w-full px-1.5 py-1 rounded bg-black/40 border border-fuchsia-500/30 text-white text-[10px] placeholder-gray-500 focus:border-fuchsia-400 focus:outline-none resize-none"
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1179,6 +1432,306 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
+                {block.type === 'typography' && (
+                  <div className="space-y-1.5">
+                    <div>
+                      <label className="block text-[8px] font-bold uppercase text-orange-300 mb-0.5">Família</label>
+                      <select
+                        value={block.data.fontFamily || 'Manrope'}
+                        onChange={(e) => {
+                          setBlocks((prev) =>
+                            prev.map((b) =>
+                              b.id === block.id ? { ...b, data: { ...b.data, fontFamily: e.target.value } } : b
+                            )
+                          );
+                        }}
+                        className="w-full px-2 py-1 rounded-md bg-black/40 border border-white/10 text-white text-[10px]"
+                      >
+                        <option value="Manrope">Manrope (padrão do cliente)</option>
+                        <option value="Inter">Inter</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Playfair Display">Playfair Display</option>
+                        <option value="Bebas Neue">Bebas Neue</option>
+                        <option value="Anton">Anton</option>
+                        <option value="Roboto">Roboto</option>
+                      </select>
+                    </div>
+
+                    {/* HEADLINE */}
+                    <div className="rounded-md bg-black/30 border border-white/10 p-1.5 space-y-1">
+                      <label className="block text-[8px] font-bold uppercase text-orange-300">Headline</label>
+                      <div className="flex gap-1">
+                        <select
+                          value={block.data.headline?.weight || '800'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, headline: { ...b.data.headline, weight: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="flex-1 px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-white text-[9px]"
+                        >
+                          <option value="300">Light 300</option>
+                          <option value="400">Regular 400</option>
+                          <option value="500">Medium 500</option>
+                          <option value="600">SemiBold 600</option>
+                          <option value="700">Bold 700</option>
+                          <option value="800">ExtraBold 800</option>
+                        </select>
+                        <input
+                          type="color"
+                          value={block.data.headline?.color || '#ffffff'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, headline: { ...b.data.headline, color: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="w-7 h-6 rounded border border-white/10 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="font-mono">{block.data.headline?.size || 56}px</span>
+                        <input
+                          type="range"
+                          min={20}
+                          max={120}
+                          value={block.data.headline?.size || 56}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, headline: { ...b.data.headline, size: Number(e.target.value) } } } : b
+                              )
+                            );
+                          }}
+                          className="flex-1 accent-orange-400"
+                          aria-label="Headline size"
+                        />
+                      </div>
+                    </div>
+
+                    {/* DESTAQUE */}
+                    <div className="rounded-md bg-black/30 border border-white/10 p-1.5 space-y-1">
+                      <label className="block text-[8px] font-bold uppercase text-orange-300">Destaque</label>
+                      <div className="flex gap-1">
+                        <select
+                          value={block.data.support?.weight || '400'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, support: { ...b.data.support, weight: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="flex-1 px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-white text-[9px]"
+                        >
+                          <option value="300">Light 300</option>
+                          <option value="400">Regular 400</option>
+                          <option value="500">Medium 500</option>
+                          <option value="600">SemiBold 600</option>
+                          <option value="700">Bold 700</option>
+                        </select>
+                        <input
+                          type="color"
+                          value={block.data.support?.color || '#f5f5f5'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, support: { ...b.data.support, color: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="w-7 h-6 rounded border border-white/10 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="font-mono">{block.data.support?.size || 22}px</span>
+                        <input
+                          type="range"
+                          min={12}
+                          max={48}
+                          value={block.data.support?.size || 22}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, support: { ...b.data.support, size: Number(e.target.value) } } } : b
+                              )
+                            );
+                          }}
+                          className="flex-1 accent-orange-400"
+                          aria-label="Support size"
+                        />
+                      </div>
+                    </div>
+
+                    {/* CTA (opcional) */}
+                    <div className="rounded-md bg-black/30 border border-white/10 p-1.5 space-y-1">
+                      <label className="block text-[8px] font-bold uppercase text-orange-300">CTA</label>
+                      <div className="flex gap-1">
+                        <select
+                          value={block.data.cta?.weight || '700'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, cta: { ...b.data.cta, weight: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="flex-1 px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-white text-[9px]"
+                        >
+                          <option value="400">Regular 400</option>
+                          <option value="600">SemiBold 600</option>
+                          <option value="700">Bold 700</option>
+                          <option value="800">ExtraBold 800</option>
+                        </select>
+                        <input
+                          type="color"
+                          value={block.data.cta?.color || '#0a0b10'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, cta: { ...b.data.cta, color: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="w-7 h-6 rounded border border-white/10 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="font-mono">bg</span>
+                        <input
+                          type="color"
+                          value={block.data.cta?.bgColor || '#10b981'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, cta: { ...b.data.cta, bgColor: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="w-7 h-5 rounded border border-white/10 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    {/* PALAVRA DESTAQUE */}
+                    <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-1.5 space-y-1">
+                      <label className="block text-[8px] font-bold uppercase text-amber-300">Palavra Destaque</label>
+                      <p className="text-[8px] text-amber-200/80 leading-tight">
+                        Marque palavras com *asterisco* na copy para destacar.
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="color"
+                          value={block.data.highlight?.color || '#fbbf24'}
+                          onChange={(e) => {
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, data: { ...b.data, highlight: { ...b.data.highlight, color: e.target.value } } } : b
+                              )
+                            );
+                          }}
+                          className="w-7 h-6 rounded border border-white/10 cursor-pointer"
+                        />
+                        <label className="flex items-center gap-1 text-[9px] text-amber-300">
+                          <input
+                            type="checkbox"
+                            checked={block.data.highlight?.underline ?? true}
+                            onChange={(e) => {
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id ? { ...b, data: { ...b.data, highlight: { ...b.data.highlight, underline: e.target.checked } } } : b
+                                )
+                              );
+                            }}
+                            className="rounded border-white/20 bg-black/40 text-amber-500"
+                          />
+                          Sublinhar
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {block.type === 'image-output' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[9px] font-bold uppercase text-emerald-300 flex items-center gap-1">
+                        <Sparkles size={9} /> Prompt Visual deste bloco
+                      </label>
+                      <span className="text-[8px] text-emerald-400 font-mono">
+                        {(block.data.visualPrompt || '').length}/800
+                      </span>
+                    </div>
+                    <textarea
+                      rows={3}
+                      maxLength={800}
+                      value={block.data.visualPrompt || ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBlocks((prev) =>
+                          prev.map((b) =>
+                            b.id === block.id ? { ...b, data: { ...b.data, visualPrompt: v } } : b
+                          )
+                        );
+                      }}
+                      placeholder="Descreva a cena deste criativo. Tem prioridade sobre o briefing global conectado."
+                      className="w-full px-2 py-1.5 rounded-md bg-black/40 border border-emerald-500/30 text-white text-[10px] placeholder-gray-500 focus:border-emerald-400 focus:outline-none resize-none"
+                    />
+                    {(block.data.visualPrompt || '').trim() && (
+                      <p className="text-[8px] text-emerald-300 leading-tight">
+                        ✨ Prompt visual deste bloco ativo.
+                      </p>
+                    )}
+
+                    {/* DROPDOWN: Copy de origem (emparelhamento explicito) */}
+                    {(() => {
+                      const inputCopiesBlocks = connections
+                        .filter((c) => c.to === block.id)
+                        .map((c) => blocks.find((b) => b.id === c.from))
+                        .filter((b): b is FlowBlock => !!b && b.type === 'copies');
+                      const copiesItems: any[] = inputCopiesBlocks.flatMap((b) => b.data?.items || []);
+                      if (copiesItems.length === 0) return null;
+                      return (
+                        <div className="pt-1">
+                          <label className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider text-yellow-400">
+                            <Hash size={8} /> Copy de origem
+                          </label>
+                          <select
+                            value={block.data.pairedCopyId ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id
+                                    ? { ...b, data: { ...b.data, pairedCopyId: v || null } }
+                                    : b
+                                )
+                              );
+                            }}
+                            className="w-full px-1.5 py-1 rounded bg-black/40 border border-yellow-500/30 text-white text-[10px]"
+                          >
+                            <option value="">— Automático (por índice) —</option>
+                            {copiesItems.map((c: any, i: number) => (
+                              <option key={c.id} value={c.id}>
+                                COPY {i + 1}: {(c.headline || '(sem headline)').substring(0, 40)}
+                              </option>
+                            ))}
+                          </select>
+                          {block.data.pairedCopyId && (
+                            <p className="text-[8px] text-yellow-300 leading-tight mt-0.5">
+                              🔗 Emparelhado com copy específica do bloco amarelo
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {block.type === 'copy-output' && (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -1255,6 +1808,23 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     <p className="text-[8px] text-gray-500 leading-tight">
                       Tempo médio: ~{(block.data.count ?? 9) * 8}s
                     </p>
+                    <label className="flex items-center gap-1.5 pt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={block.data.useIndividualPrompts ?? true}
+                        onChange={(e) => {
+                          setBlocks((prev) =>
+                            prev.map((b) =>
+                              b.id === block.id ? { ...b, data: { ...b.data, useIndividualPrompts: e.target.checked } } : b
+                            )
+                          );
+                        }}
+                        className="rounded border-violet-500/30 bg-black/40 text-violet-400 focus:ring-violet-400"
+                      />
+                      <span className="text-[8px] font-bold uppercase tracking-wider text-violet-300">
+                        Prompts individuais (recomendado)
+                      </span>
+                    </label>
                   </div>
                 )}
 
@@ -1429,6 +1999,70 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               </div>
             </div>
 
+            {/* SLIDERS DE POSICAO DO LOGO (X/Y/Tamanho) */}
+            {logoUrlForModal && (
+              <div className="mb-5 p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    🏷️ Posição do Logo (X / Y / Tamanho %)
+                  </h4>
+                  <button
+                    onClick={resetLogoPosition}
+                    className="text-[10px] text-gray-400 hover:text-white px-2 py-1 rounded border border-white/10 hover:border-white/30"
+                  >
+                    Resetar
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-purple-300 uppercase tracking-wider">X</span>
+                      <span className="text-gray-400 font-mono">{Math.round(logoPosition.x)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={logoPosition.x}
+                      onChange={(e) => setLogoPosition((p) => ({ ...p, x: Number(e.target.value) }))}
+                      className="w-full accent-purple-400"
+                      aria-label="Logo X"
+                    />
+                  </div>
+                  <div className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-purple-300 uppercase tracking-wider">Y</span>
+                      <span className="text-gray-400 font-mono">{Math.round(logoPosition.y)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={logoPosition.y}
+                      onChange={(e) => setLogoPosition((p) => ({ ...p, y: Number(e.target.value) }))}
+                      className="w-full accent-purple-400"
+                      aria-label="Logo Y"
+                    />
+                  </div>
+                  <div className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-purple-300 uppercase tracking-wider">Tamanho</span>
+                      <span className="text-gray-400 font-mono">{Math.round(logoPosition.size)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="50"
+                      value={logoPosition.size}
+                      onChange={(e) => setLogoPosition((p) => ({ ...p, size: Number(e.target.value) }))}
+                      className="w-full accent-purple-400"
+                      aria-label="Logo size"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {Array.isArray(outputModal.output) ? (
               <div className="grid grid-cols-2 gap-3">
                 {outputModal.output.map((out: any, i: number) => {
@@ -1446,26 +2080,63 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                         <>
                           <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
                             <img src={imageUrl} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
+                            {logoUrlForModal && (
+                              <img
+                                src={logoUrlForModal}
+                                alt="Logo"
+                                className="absolute pointer-events-none"
+                                style={{
+                                  left: `${logoPosition.x}%`,
+                                  top: `${logoPosition.y}%`,
+                                  width: `${logoPosition.size}%`,
+                                  maxHeight: '20%',
+                                  objectFit: 'contain',
+                                  transform: 'translate(0, 0)',
+                                }}
+                              />
+                            )}
                             {headlineToShow && (
                               <h4
-                                className="absolute text-2xl font-black uppercase leading-[0.95] text-white drop-shadow-lg max-w-[85%]"
-                                style={{ left: `${textPositions.headline.x}%`, top: `${textPositions.headline.y}%` }}
+                                className="absolute uppercase leading-[0.95] drop-shadow-lg max-w-[85%]"
+                                style={{
+                                  left: `${textPositions.headline.x}%`,
+                                  top: `${textPositions.headline.y}%`,
+                                  fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
+                                  fontWeight: typographyForModal?.headline?.weight || 800,
+                                  fontSize: `${typographyForModal?.headline?.size || 36}px`,
+                                  color: typographyForModal?.headline?.color || '#ffffff',
+                                }}
                               >
-                                {headlineToShow}
+                                {renderHeadlineWithHighlight(headlineToShow, typographyForModal?.highlight)}
                               </h4>
                             )}
                             {supportToShow && (
                               <p
-                                className="absolute max-w-[85%] text-sm font-medium leading-tight text-white/90 drop-shadow"
-                                style={{ left: `${textPositions.support.x}%`, top: `${textPositions.support.y}%` }}
+                                className="absolute max-w-[85%] leading-tight drop-shadow"
+                                style={{
+                                  left: `${textPositions.support.x}%`,
+                                  top: `${textPositions.support.y}%`,
+                                  fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
+                                  fontWeight: typographyForModal?.support?.weight || 400,
+                                  fontSize: `${typographyForModal?.support?.size || 16}px`,
+                                  color: typographyForModal?.support?.color || '#f5f5f5',
+                                }}
                               >
                                 {supportToShow}
                               </p>
                             )}
                             {ctaToShow && (
                               <span
-                                className="absolute inline-flex rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black uppercase text-black shadow-lg"
-                                style={{ left: `${textPositions.cta.x}%`, top: `${textPositions.cta.y}%` }}
+                                className="absolute inline-flex rounded-lg px-3 py-2 uppercase shadow-lg"
+                                style={{
+                                  left: `${textPositions.cta.x}%`,
+                                  top: `${textPositions.cta.y}%`,
+                                  fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
+                                  fontWeight: typographyForModal?.cta?.weight || 700,
+                                  fontSize: `${typographyForModal?.cta?.size || 14}px`,
+                                  color: typographyForModal?.cta?.color || '#0a0b10',
+                                  backgroundColor: typographyForModal?.cta?.bgColor || '#10b981',
+                                }}
                               >
                                 {ctaToShow}
                               </span>
@@ -1515,26 +2186,62 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                 <div id="flow-creative-preview-0" className="relative aspect-square overflow-hidden bg-black">
                   <img src={outputModal.output} alt="Resultado" className="absolute inset-0 h-full w-full object-cover" />
+                  {logoUrlForModal && (
+                    <img
+                      src={logoUrlForModal}
+                      alt="Logo"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${logoPosition.x}%`,
+                        top: `${logoPosition.y}%`,
+                        width: `${logoPosition.size}%`,
+                        maxHeight: '20%',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  )}
                   {creativeText.headline && (
                     <h4
-                      className="absolute text-4xl font-black uppercase leading-[0.95] text-white drop-shadow-lg max-w-[85%]"
-                      style={{ left: `${textPositions.headline.x}%`, top: `${textPositions.headline.y}%` }}
+                      className="absolute uppercase leading-[0.95] drop-shadow-lg max-w-[85%]"
+                      style={{
+                        left: `${textPositions.headline.x}%`,
+                        top: `${textPositions.headline.y}%`,
+                        fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
+                        fontWeight: typographyForModal?.headline?.weight || 800,
+                        fontSize: `${(typographyForModal?.headline?.size || 56)}px`,
+                        color: typographyForModal?.headline?.color || '#ffffff',
+                      }}
                     >
-                      {creativeText.headline}
+                      {renderHeadlineWithHighlight(creativeText.headline, typographyForModal?.highlight)}
                     </h4>
                   )}
                   {creativeText.support && (
                     <p
-                      className="absolute max-w-[85%] text-base font-medium leading-tight text-white/90 drop-shadow"
-                      style={{ left: `${textPositions.support.x}%`, top: `${textPositions.support.y}%` }}
+                      className="absolute max-w-[85%] leading-tight drop-shadow"
+                      style={{
+                        left: `${textPositions.support.x}%`,
+                        top: `${textPositions.support.y}%`,
+                        fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
+                        fontWeight: typographyForModal?.support?.weight || 400,
+                        fontSize: `${typographyForModal?.support?.size || 22}px`,
+                        color: typographyForModal?.support?.color || '#f5f5f5',
+                      }}
                     >
                       {creativeText.support}
                     </p>
                   )}
                   {creativeText.cta && (
                     <span
-                      className="absolute inline-flex rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black uppercase text-black shadow-lg"
-                      style={{ left: `${textPositions.cta.x}%`, top: `${textPositions.cta.y}%` }}
+                      className="absolute inline-flex rounded-xl px-4 py-2.5 uppercase shadow-lg"
+                      style={{
+                        left: `${textPositions.cta.x}%`,
+                        top: `${textPositions.cta.y}%`,
+                        fontFamily: typographyForModal?.fontFamily || 'Manrope, sans-serif',
+                        fontWeight: typographyForModal?.cta?.weight || 700,
+                        fontSize: `${typographyForModal?.cta?.size || 16}px`,
+                        color: typographyForModal?.cta?.color || '#0a0b10',
+                        backgroundColor: typographyForModal?.cta?.bgColor || '#10b981',
+                      }}
                     >
                       {creativeText.cta}
                     </span>
@@ -1587,7 +2294,8 @@ interface CopyItem {
   id: string;
   headline: string;
   support: string;
-  cta: string;
+  cta?: string;
+  visualPrompt?: string;
 }
 
 interface PasteMultipleCopiesModalProps {
@@ -1603,10 +2311,10 @@ const PasteMultipleCopiesModal: React.FC<PasteMultipleCopiesModalProps> = ({
   onClose,
 }) => {
   const [text, setText] = useState(() => {
-    // Pre-preencher com os itens atuais no formato Headline | Destaque | CTA por linha
+    // Pre-preencher com os itens atuais no formato Headline | Destaque (| CTA opcional) por linha
     return currentItems
       .filter((it) => it.headline || it.support || it.cta)
-      .map((it) => `${it.headline} | ${it.support} | ${it.cta}`)
+      .map((it) => `${it.headline} | ${it.support}${it.cta ? ` | ${it.cta}` : ''}`)
       .join('\n');
   });
 
@@ -1658,7 +2366,7 @@ const PasteMultipleCopiesModal: React.FC<PasteMultipleCopiesModalProps> = ({
               📋 Colar Múltiplas Copys
             </h3>
             <p className="text-xs text-gray-400 mt-1">
-              Uma copy por linha. Use <code className="text-yellow-300">Headline | Destaque | CTA</code> para separar os campos.
+              Uma copy por linha. Use <code className="text-yellow-300">Headline | Destaque</code> (CTA opcional, ex: <code className="text-yellow-300">| CTA</code>).
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white p-1.5">
@@ -1669,7 +2377,7 @@ const PasteMultipleCopiesModal: React.FC<PasteMultipleCopiesModalProps> = ({
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Headline 1 | Destaque 1 | CTA 1&#10;Headline 2 | Destaque 2 | CTA 2&#10;..."
+          placeholder="Headline 1 | Destaque 1&#10;Headline 2 | Destaque 2 | CTA opcional&#10;..."
           rows={10}
           className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-sm font-mono focus:border-yellow-400 focus:outline-none resize-y"
         />
@@ -1739,6 +2447,7 @@ function getDefaultLabel(type: BlockType): string {
     case 'expert': return 'Foto Expert';
     case 'reference': return 'Referência';
     case 'style': return 'Estilo';
+    case 'typography': return 'Tipografia';
     case 'copies': return 'Copys';
     case 'copy-output': return 'Gerar Copy (4x)';
     case 'image-output': return 'Gerar Imagem';
@@ -1754,13 +2463,20 @@ function getDefaultData(type: BlockType): any {
     case 'expert': return { imageUrl: null, preserveIdentity: true };
     case 'reference': return { imageUrl: null, filename: null };
     case 'style': return { tone: '', color: '#10b981' };
+    case 'typography': return {
+      fontFamily: 'Manrope',
+      headline: { weight: '800', size: 56, color: '#ffffff' },
+      support:  { weight: '400', size: 22, color: '#f5f5f5' },
+      cta:      { weight: '700', size: 14, color: '#0a0b10', bgColor: '#10b981' },
+      highlight:    { color: '#fbbf24', underline: true },
+    };
     case 'copies': return {
       items: [
-        { id: `copy-${Date.now()}-1`, headline: '', support: '', cta: '' },
+        { id: `copy-${Date.now()}-1`, headline: '', support: '', cta: '', visualPrompt: '' },
       ],
     };
     case 'copy-output': return { customPrompt: '', count: 4 };
-    case 'batch-output': return { count: 9 };
+    case 'batch-output': return { count: 9, useIndividualPrompts: true };
     default: return {};
   }
 }
