@@ -32,6 +32,7 @@ export type BlockType =
   | 'expert'
   | 'reference'
   | 'style'
+  | 'copies'
   | 'copy-output'
   | 'image-output'
   | 'variations-output'
@@ -112,6 +113,13 @@ const BLOCK_CONFIG: Record<BlockType, {
     bgColor: 'bg-amber-500/5',
     description: 'Gera 4 variações de copy',
   },
+  copies: {
+    icon: Hash,
+    color: 'text-yellow-400',
+    borderColor: 'border-yellow-500/40 hover:border-yellow-500',
+    bgColor: 'bg-yellow-500/5',
+    description: 'Várias copys manuais para N criativos',
+  },
   'image-output': {
     icon: ImageIcon,
     color: 'text-emerald-400',
@@ -144,6 +152,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [generating, setGenerating] = useState<string | null>(null);
   const [generateProgress, setGenerateProgress] = useState<{ current: number; total: number } | null>(null);
   const [outputModal, setOutputModal] = useState<{ blockId: string; output: any } | null>(null);
+  const [pasteModal, setPasteModal] = useState<{ blockId: string } | null>(null);
   const [creativeText, setCreativeText] = useState({ headline: '', support: '', cta: '' });
   const [downloadingPreview, setDownloadingPreview] = useState<number | null>(null);
   const [downloadingZip, setDownloadingZip] = useState(false);
@@ -412,6 +421,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       .filter((b) => b.type === 'reference' && b.data?.imageUrl)
       .map((b) => b.data.imageUrl as string);
 
+    // Copys manuais conectadas (para emparelhar Copy[i] -> Imagem[i])
+    const copiesBlock = inputBlocks.find((b) => b.type === 'copies');
+    const copiesList: Array<{ headline: string; support: string; cta: string }> =
+      (copiesBlock?.data?.items || []).filter(
+        (c: any) => c && (c.headline?.trim() || c.support?.trim() || c.cta?.trim())
+      );
+
     const requiresBriefing =
       block.type === 'copy-output' ||
       block.type === 'image-output' ||
@@ -438,28 +454,65 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           prev.map((b): FlowBlock => (b.id === blockId ? { ...b, output: variations } : b))
         );
         setOutputModal({ blockId, output: variations });
-      } else if (block.type === 'image-output' || block.type === 'variations-output' || block.type === 'batch-output') {
+      } else if (
+        block.type === 'image-output' ||
+        block.type === 'variations-output' ||
+        block.type === 'batch-output'
+      ) {
         let count = 1;
         if (block.type === 'image-output') count = 1;
         else if (block.type === 'variations-output') count = 4;
         else if (block.type === 'batch-output') {
           count = Math.min(Math.max(parseInt(String(block.data.count)) || 9, 1), 12);
         }
-        const imageUrls: string[] = [];
+
+        // Se houver copies manuais conectadas, limitar count ao tamanho da lista
+        if (copiesList.length > 0 && block.type === 'batch-output') {
+          count = Math.min(count, copiesList.length);
+        }
+
+        // Gerar imagens em loop
+        const items: Array<{ imageUrl: string; copy?: { headline: string; support: string; cta: string } }> = [];
         for (let i = 0; i < count; i++) {
           setGenerateProgress({ current: i + 1, total: count });
           const url = await generateImage(briefing, style, logo, apiKey, references, expertImage, expertPreserve);
-          if (url) imageUrls.push(url);
+          if (url) {
+            const copyForThis = copiesList[i] || null;
+            items.push(copyForThis ? { imageUrl: url, copy: copyForThis } : { imageUrl: url });
+          }
         }
+
+        // Quando vem de Lote N com copies, output eh array de objetos
+        // Caso contrario, manter compatibilidade: array de strings OU string unica
+        const legacyOutput: string[] = items.map((it) => it.imageUrl);
         setBlocks((prev) =>
           prev.map((b): FlowBlock =>
-            b.id === blockId ? { ...b, output: imageUrls } : b
+            b.id === blockId ? { ...b, output: legacyOutput } : b
           )
         );
-        if (block.type === 'image-output' && imageUrls[0]) {
-          setOutputModal({ blockId, output: imageUrls[0] });
+
+        // Salvar mapeamento copy -> imagem em um registro separado (por bloco)
+        if (copiesList.length > 0) {
+          setBlocks((prev) =>
+            prev.map((b): FlowBlock =>
+              b.id === blockId
+                ? {
+                    ...b,
+                    data: {
+                      ...b.data,
+                      pairedCopies: items.map((it) => it.copy || null),
+                    },
+                  }
+                : b
+            )
+          );
+        }
+
+        if (block.type === 'image-output' && items[0]) {
+          setOutputModal({ blockId, output: items[0].imageUrl });
         } else {
-          setOutputModal({ blockId, output: imageUrls });
+          // Para batch/variations, passamos objetos com imageUrl + copy
+          setOutputModal({ blockId, output: items });
         }
       }
     } catch (err: any) {
@@ -486,6 +539,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/30"
           >
             <Type size={12} /> Briefing
+          </button>
+          <button
+            onClick={() => handleCreateBlock('copies')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 border border-yellow-500/30"
+            title="Insira várias copys manualmente (uma por criativo)"
+          >
+            <Hash size={12} /> Copys
           </button>
           <button
             onClick={() => handleCreateBlock('logo')}
@@ -859,6 +919,164 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
+                {block.type === 'copies' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-300 font-bold">
+                        {(block.data.items?.length || 0)} copys
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPasteModal({ blockId: block.id });
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 text-[9px] font-bold hover:bg-yellow-500/30 border border-yellow-500/30"
+                          title="Colar várias linhas (uma por copy, separadas por linha em branco ou ---)"
+                        >
+                          📋 Colar
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                      {(block.data.items || []).map((item: any, idx: number) => (
+                        <div key={item.id} className="rounded-lg bg-black/30 border border-white/10 p-1.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] text-yellow-400 font-bold">COPY {idx + 1}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBlocks((prev) =>
+                                  prev.map((b) =>
+                                    b.id === block.id
+                                      ? {
+                                          ...b,
+                                          data: {
+                                            ...b.data,
+                                            items: (b.data.items || []).filter(
+                                              (it: any) => it.id !== item.id
+                                            ),
+                                          },
+                                        }
+                                      : b
+                                  )
+                                );
+                              }}
+                              className="text-gray-500 hover:text-red-400"
+                              title="Remover copy"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Headline"
+                            value={item.headline}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id
+                                    ? {
+                                        ...b,
+                                        data: {
+                                          ...b.data,
+                                          items: (b.data.items || []).map((it: any) =>
+                                            it.id === item.id ? { ...it, headline: v } : it
+                                          ),
+                                        },
+                                      }
+                                    : b
+                                )
+                              );
+                            }}
+                            className="w-full px-1.5 py-1 rounded bg-black/40 border border-white/10 text-white text-[10px] focus:border-yellow-400 focus:outline-none"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Destaque"
+                            value={item.support}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id
+                                    ? {
+                                        ...b,
+                                        data: {
+                                          ...b.data,
+                                          items: (b.data.items || []).map((it: any) =>
+                                            it.id === item.id ? { ...it, support: v } : it
+                                          ),
+                                        },
+                                      }
+                                    : b
+                                )
+                              );
+                            }}
+                            className="w-full px-1.5 py-1 rounded bg-black/40 border border-white/10 text-white text-[10px] focus:border-yellow-400 focus:outline-none"
+                          />
+                          <input
+                            type="text"
+                            placeholder="CTA"
+                            value={item.cta}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setBlocks((prev) =>
+                                prev.map((b) =>
+                                  b.id === block.id
+                                    ? {
+                                        ...b,
+                                        data: {
+                                          ...b.data,
+                                          items: (b.data.items || []).map((it: any) =>
+                                            it.id === item.id ? { ...it, cta: v } : it
+                                          ),
+                                        },
+                                      }
+                                    : b
+                                )
+                              );
+                            }}
+                            className="w-full px-1.5 py-1 rounded bg-black/40 border border-white/10 text-white text-[10px] focus:border-yellow-400 focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBlocks((prev) =>
+                          prev.map((b) =>
+                            b.id === block.id
+                              ? {
+                                  ...b,
+                                  data: {
+                                    ...b.data,
+                                    items: [
+                                      ...(b.data.items || []),
+                                      {
+                                        id: `copy-${Date.now()}-${(b.data.items?.length || 0) + 1}`,
+                                        headline: '',
+                                        support: '',
+                                        cta: '',
+                                      },
+                                    ],
+                                  },
+                                }
+                              : b
+                          )
+                        );
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border border-dashed border-yellow-500/40 text-yellow-300 text-[10px] font-bold hover:bg-yellow-500/10"
+                    >
+                      <Plus size={11} /> Adicionar copy
+                    </button>
+                  </div>
+                )}
+
                 {block.type === 'reference' && (
                   <div>
                     {block.data.imageUrl ? (
@@ -1157,70 +1375,85 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
             {Array.isArray(outputModal.output) ? (
               <div className="grid grid-cols-2 gap-3">
-                {outputModal.output.map((out: any, i: number) => (
-                  <div key={i} className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
-                    {typeof out === 'string' && out.startsWith('data:image') ? (
-                      <>
-                        <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
-                          <img src={out} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
-                          {creativeText.headline && (
-                            <h4
-                              className="absolute text-2xl font-black uppercase leading-[0.95] text-white drop-shadow-lg max-w-[85%]"
-                              style={{ left: `${textPositions.headline.x}%`, top: `${textPositions.headline.y}%` }}
-                            >
-                              {creativeText.headline}
-                            </h4>
+                {outputModal.output.map((out: any, i: number) => {
+                  // Suporte ao novo formato { imageUrl, copy } OU string legado
+                  const imageUrl: string | null =
+                    typeof out === 'string' ? out : out?.imageUrl || null;
+                  const pairedCopy = typeof out === 'object' ? out?.copy : null;
+                  const headlineToShow = pairedCopy?.headline || creativeText.headline;
+                  const supportToShow = pairedCopy?.support || creativeText.support;
+                  const ctaToShow = pairedCopy?.cta || creativeText.cta;
+
+                  return (
+                    <div key={i} className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
+                      {imageUrl ? (
+                        <>
+                          <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
+                            <img src={imageUrl} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
+                            {headlineToShow && (
+                              <h4
+                                className="absolute text-2xl font-black uppercase leading-[0.95] text-white drop-shadow-lg max-w-[85%]"
+                                style={{ left: `${textPositions.headline.x}%`, top: `${textPositions.headline.y}%` }}
+                              >
+                                {headlineToShow}
+                              </h4>
+                            )}
+                            {supportToShow && (
+                              <p
+                                className="absolute max-w-[85%] text-sm font-medium leading-tight text-white/90 drop-shadow"
+                                style={{ left: `${textPositions.support.x}%`, top: `${textPositions.support.y}%` }}
+                              >
+                                {supportToShow}
+                              </p>
+                            )}
+                            {ctaToShow && (
+                              <span
+                                className="absolute inline-flex rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black uppercase text-black shadow-lg"
+                                style={{ left: `${textPositions.cta.x}%`, top: `${textPositions.cta.y}%` }}
+                              >
+                                {ctaToShow}
+                              </span>
+                            )}
+                          </div>
+                          {pairedCopy && (
+                            <div className="bg-yellow-500/10 border-t border-yellow-500/30 px-3 py-1.5 text-[10px] text-yellow-200 font-bold">
+                              📝 Copy {i + 1}: {pairedCopy.headline || '(sem headline)'} · {pairedCopy.cta || '(sem CTA)'}
+                            </div>
                           )}
-                          {creativeText.support && (
-                            <p
-                              className="absolute max-w-[85%] text-sm font-medium leading-tight text-white/90 drop-shadow"
-                              style={{ left: `${textPositions.support.x}%`, top: `${textPositions.support.y}%` }}
-                            >
-                              {creativeText.support}
-                            </p>
-                          )}
-                          {creativeText.cta && (
-                            <span
-                              className="absolute inline-flex rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black uppercase text-black shadow-lg"
-                              style={{ left: `${textPositions.cta.x}%`, top: `${textPositions.cta.y}%` }}
-                            >
-                              {creativeText.cta}
-                            </span>
+                          <button
+                            onClick={() => handleDownloadPreview(i)}
+                            disabled={downloadingPreview === i}
+                            className="flex w-full items-center justify-center gap-2 border-t border-white/10 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                          >
+                            {downloadingPreview === i ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                            Baixar PNG
+                          </button>
+                        </>
+                      ) : (
+                        <div className="space-y-3 p-3 bg-black/30">
+                          <p className="text-xs text-gray-300">{typeof out === 'string' ? out : JSON.stringify(out, null, 2)}</p>
+                          {typeof out === 'string' && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => useCopyInCreative(out)}
+                                className="flex-1 rounded-md bg-amber-400 px-2 py-1.5 text-[10px] font-black text-black hover:bg-amber-300"
+                              >
+                                Usar esta copy
+                              </button>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(out)}
+                                aria-label="Copiar texto"
+                                className="rounded-md border border-white/10 px-2 text-gray-300 hover:bg-white/10"
+                              >
+                                <Copy size={12} />
+                              </button>
+                            </div>
                           )}
                         </div>
-                        <button
-                          onClick={() => handleDownloadPreview(i)}
-                          disabled={downloadingPreview === i}
-                          className="flex w-full items-center justify-center gap-2 border-t border-white/10 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
-                        >
-                          {downloadingPreview === i ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                          Baixar PNG
-                        </button>
-                      </>
-                    ) : (
-                      <div className="space-y-3 p-3 bg-black/30">
-                        <p className="text-xs text-gray-300">{typeof out === 'string' ? out : JSON.stringify(out, null, 2)}</p>
-                        {typeof out === 'string' && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => useCopyInCreative(out)}
-                              className="flex-1 rounded-md bg-amber-400 px-2 py-1.5 text-[10px] font-black text-black hover:bg-amber-300"
-                            >
-                              Usar esta copy
-                            </button>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(out)}
-                              aria-label="Copiar texto"
-                              className="rounded-md border border-white/10 px-2 text-gray-300 hover:bg-white/10"
-                            >
-                              <Copy size={12} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : typeof outputModal.output === 'string' && outputModal.output.startsWith('data:image') ? (
               <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20">
@@ -1266,6 +1499,166 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           </div>
         </div>
       )}
+
+      {/* MODAL COLAR MULTIPLAS COPYS */}
+      {pasteModal && (
+        <PasteMultipleCopiesModal
+          blockId={pasteModal.blockId}
+          onClose={() => setPasteModal(null)}
+          onApply={(items) => {
+            setBlocks((prev) =>
+              prev.map((b) =>
+                b.id === pasteModal.blockId
+                  ? { ...b, data: { ...b.data, items } }
+                  : b
+              )
+            );
+            setPasteModal(null);
+          }}
+          currentItems={
+            blocks.find((b) => b.id === pasteModal.blockId)?.data?.items || []
+          }
+        />
+      )}
+    </div>
+  );
+};
+
+// =============================================================
+// PASTE MULTIPLE COPIES MODAL (colar várias linhas de uma vez)
+// =============================================================
+interface CopyItem {
+  id: string;
+  headline: string;
+  support: string;
+  cta: string;
+}
+
+interface PasteMultipleCopiesModalProps {
+  blockId: string;
+  currentItems: CopyItem[];
+  onApply: (items: CopyItem[]) => void;
+  onClose: () => void;
+}
+
+const PasteMultipleCopiesModal: React.FC<PasteMultipleCopiesModalProps> = ({
+  currentItems,
+  onApply,
+  onClose,
+}) => {
+  const [text, setText] = useState(() => {
+    // Pre-preencher com os itens atuais no formato Headline | Destaque | CTA por linha
+    return currentItems
+      .filter((it) => it.headline || it.support || it.cta)
+      .map((it) => `${it.headline} | ${it.support} | ${it.cta}`)
+      .join('\n');
+  });
+
+  const [parsed, setParsed] = useState<CopyItem[]>([]);
+
+  const parseCopies = () => {
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    const items: CopyItem[] = lines.map((line, i) => {
+      const parts = line.split('|').map((p) => p.trim());
+      return {
+        id: `copy-pasted-${Date.now()}-${i}`,
+        headline: parts[0] || '',
+        support: parts[1] || '',
+        cta: parts[2] || '',
+      };
+    });
+    return items;
+  };
+
+  const handlePreview = () => {
+    const items = parseCopies();
+    setParsed(items);
+  };
+
+  const handleApply = () => {
+    const items = parsed.length > 0 ? parsed : parseCopies();
+    if (items.length === 0) {
+      alert('Cole ao menos uma copy antes de aplicar.');
+      return;
+    }
+    if (items.length > 12) {
+      alert('Limite máximo de 12 copys por bloco.');
+      return;
+    }
+    onApply(items);
+  };
+
+  const itemsToShow = parsed.length > 0 ? parsed : parseCopies();
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#0d0f17] border border-yellow-500/30 rounded-3xl p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              📋 Colar Múltiplas Copys
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Uma copy por linha. Use <code className="text-yellow-300">Headline | Destaque | CTA</code> para separar os campos.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-1.5">
+            <X size={20} />
+          </button>
+        </div>
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Headline 1 | Destaque 1 | CTA 1&#10;Headline 2 | Destaque 2 | CTA 2&#10;..."
+          rows={10}
+          className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-sm font-mono focus:border-yellow-400 focus:outline-none resize-y"
+        />
+
+        <div className="flex items-center justify-between mt-4 mb-3">
+          <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">
+            {itemsToShow.length} copys detectadas (máx 12)
+          </span>
+          <button
+            onClick={handlePreview}
+            className="text-xs font-bold text-yellow-400 hover:text-yellow-300 px-3 py-1 rounded border border-yellow-500/30 hover:bg-yellow-500/10"
+          >
+            Atualizar Preview
+          </button>
+        </div>
+
+        <div className="space-y-1 max-h-44 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2 mb-4">
+          {itemsToShow.length === 0 && (
+            <p className="text-xs text-gray-500 italic p-3">Nenhuma copy detectada.</p>
+          )}
+          {itemsToShow.slice(0, 12).map((it, i) => (
+            <div key={i} className="px-2 py-1.5 rounded-md bg-white/[0.03] border border-white/5 text-[11px]">
+              <span className="font-bold text-yellow-400 mr-2">#{i + 1}</span>
+              <span className="font-bold text-white">{it.headline || '(sem headline)'}</span>
+              {it.support && <span className="text-gray-400"> · {it.support}</span>}
+              {it.cta && <span className="text-emerald-400"> · {it.cta}</span>}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-400 hover:text-white transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleApply}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-yellow-500 to-amber-500 text-dark-900 hover:opacity-95 transition-all shadow-lg"
+          >
+            <Check size={16} /> Aplicar {itemsToShow.length} copys
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1290,6 +1683,7 @@ function getDefaultLabel(type: BlockType): string {
     case 'expert': return 'Foto Expert';
     case 'reference': return 'Referência';
     case 'style': return 'Estilo';
+    case 'copies': return 'Copys';
     case 'copy-output': return 'Gerar Copy (4x)';
     case 'image-output': return 'Gerar Imagem';
     case 'variations-output': return '4 Variações';
@@ -1304,6 +1698,11 @@ function getDefaultData(type: BlockType): any {
     case 'expert': return { imageUrl: null, preserveIdentity: true };
     case 'reference': return { imageUrl: null, filename: null };
     case 'style': return { tone: '', color: '#10b981' };
+    case 'copies': return {
+      items: [
+        { id: `copy-${Date.now()}-1`, headline: '', support: '', cta: '' },
+      ],
+    };
     case 'batch-output': return { count: 9 };
     default: return {};
   }
