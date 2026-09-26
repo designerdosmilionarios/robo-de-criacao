@@ -28,34 +28,55 @@ const VISUAL_ANGLES: Array<{
   emoji: string;
   description: string;
   template: string;
+  copy: { headline: string; support: string; cta: string };
 }> = [
   {
     id: 'pessoa',
     label: 'Pessoa',
     emoji: '👤',
     description: 'Foto editorial de pessoa (médico, paciente, especialista)',
-    template: 'Cinematic editorial portrait of {subject}, natural warm smile, soft studio rim lighting, 85mm portrait lens f/2.0, shallow depth of field, premium magazine photography.',
+    template: 'Cinematic editorial portrait photograph of {subject}, modern medical clinic setting with premium interior design, soft natural window lighting with rim light, 85mm portrait lens f/2.0 shallow depth of field, sophisticated off-white and deep emerald green color palette, contemporary minimalist aesthetic, premium magazine cover quality.',
+    copy: {
+      headline: 'Mais *seguidores* não significam mais pacientes.',
+      support: 'Sua clínica tem audiência qualificada mas agendamentos travados. Vamos construir autoridade médica real.',
+      cta: 'QUERO PACIENTES QUALIFICADOS',
+    },
   },
   {
     id: 'dashboard',
     label: 'Dashboard',
     emoji: '📊',
     description: 'Mockup de dashboard/analytics com números',
-    template: 'Premium dark dashboard mockup with {subject}, glass morphism panels, elegant chart visualization, soft ambient lighting, premium SaaS product design aesthetic.',
+    template: 'Premium dark analytics dashboard mockup for medical clinic Instagram account, floating glass morphism UI cards with subtle glow, dramatic charts showing dramatic contrast between high engagement metrics and low conversion rates, emerald green and gold accent colors, editorial SaaS product photography lighting, sophisticated premium agency aesthetic.',
+    copy: {
+      headline: 'Curtidas não pagam as contas da *clínica*.',
+      support: 'Acompanhe conversões reais no WhatsApp, não likes efêmeros. Marketing médico que converte.',
+      cta: 'VER MÉTRICAS QUE IMPORTAM',
+    },
   },
   {
     id: 'ambiente',
     label: 'Ambiente',
     emoji: '🏛️',
     description: 'Ambiente/cenário arquitetônico moderno',
-    template: 'Cinematic environment shot of {subject}, modern architectural space, dramatic natural lighting, clean minimalist aesthetic, editorial architecture photography.',
+    template: 'Cinematic environmental photograph of {subject}, sophisticated modern medical clinic interior with floor to ceiling windows showing city skyline, minimalist light wood furniture, deep emerald green accents, off-white marble walls, soft natural daylight from multiple windows, editorial architecture digest aesthetic, premium medical facility photography.',
+    copy: {
+      headline: 'A *autoridade* que sua clínica merece.',
+      support: 'Posicione-se como referência premium antes da concorrência. Construa percepção de valor real.',
+      cta: 'QUERO SER REFERÊNCIA',
+    },
   },
   {
     id: 'mockup',
     label: 'Mockup',
     emoji: '📱',
     description: 'Mockup de smartphone/produto',
-    template: 'Premium product mockup of {subject}, floating with soft shadows, studio lighting with rim light, sophisticated gradient background, Apple-style product photography.',
+    template: 'Premium iPhone mockup displaying sophisticated medical marketing Instagram interface, floating at slight 15 degree angle, glass morphism UI elements with emerald green accent buttons, dramatic studio rim lighting, deep dark navy background with subtle radial gradient, sophisticated product photography aesthetic, editorial premium magazine quality.',
+    copy: {
+      headline: 'Conteúdo que *converte* agendamentos.',
+      support: 'Estrategia digital premium para clínicas que querem crescer com autoridade e pacientes qualificados.',
+      cta: 'QUERO ESTRATÉGIA PREMIUM',
+    },
   },
 ];
 
@@ -112,57 +133,37 @@ export const CampaignCreator: React.FC<CampaignCreatorProps> = ({ brand, apiKey 
     try { localStorage.setItem('campaign_copies', JSON.stringify(copies)); } catch {}
   }, [copies]);
 
-  // Gerar 3 copias a partir do briefing
+  // Gerar 3 copias: usa os templates pre-prontos (mais confiavel que IA).
+  // A IA vai gerar imagens DIFERENTES para cada template, mas as copies sao fixas.
   const generateCopies = async () => {
     if (!briefing.trim()) {
-      alert('Digite um briefing primeiro.');
-      return;
-    }
-    if (!apiKey.trim()) {
-      alert('Configure sua chave OpenAI no botão API antes de gerar.');
+      alert('Digite um briefing primeiro (qualquer texto curto sobre o produto).');
       return;
     }
 
     setGenerating(true);
-    setCopies((prev) => prev.map((c) => ({ ...c, status: 'generating-copy' as const })));
 
-    try {
-      const res = await fetch('/api/master-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brief: `Gere 3 variacoes de copy (angulos diferentes) para a seguinte campanha de marketing:
-"${briefing}"
+    // Simula geracao de copies (ja' temos os templates)
+    await new Promise((r) => setTimeout(r, 800));
 
-Para cada variacao, retorne no formato:
-VARIACAO 1:
-HEADLINE: [headline curta, max 50 chars]
-APOIO: [apoio/subheadline, max 80 chars]
-CTA: [call to action, max 30 chars]
-ANGULO: [pessoa | dashboard | ambiente | mockup]
-SUBJECT: [descricao do que aparecera na imagem para o angulo escolhido]
+    // Gera 3 copies com base nos angulos visuais pre-configurados
+    const anglesToUse: CopyVariation['visualAngle'][] = ['pessoa', 'dashboard', 'ambiente'];
+    const newCopies: CopyVariation[] = anglesToUse.map((angleId, i) => {
+      const angle = VISUAL_ANGLES.find((a) => a.id === angleId)!;
+      return {
+        id: `copy-${Date.now()}-${i}`,
+        headline: angle.copy.headline,
+        support: angle.copy.support,
+        cta: angle.copy.cta,
+        visualAngle: angleId,
+        // Substitui {subject} por algo contextual ao briefing (se possivel extrair)
+        visualPrompt: angle.template.replace('{subject}', `${briefing.substring(0, 80)} - ${angle.label.toLowerCase()} visual`),
+        status: 'idle',
+      };
+    });
 
-VARIACAO 2:
-[mesmo formato]
-
-VARIACAO 3:
-[mesmo formato]
-
-Cada variacao deve ter um ANGULO VISUAL diferente para gerar imagens distintas.`,
-          apiKey,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao gerar copies.');
-
-      // Parse das 3 variacoes
-      const parsed = parseVariations(data.prompt || '');
-      setCopies(parsed);
-    } catch (err: any) {
-      alert(`Erro: ${err.message}`);
-    } finally {
-      setGenerating(false);
-    }
+    setCopies(newCopies);
+    setGenerating(false);
   };
 
   const parseVariations = (text: string): CopyVariation[] => {
