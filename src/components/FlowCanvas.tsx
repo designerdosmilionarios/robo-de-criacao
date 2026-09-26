@@ -447,8 +447,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     setGenerating(blockId);
     try {
       if (block.type === 'copy-output') {
-        // Gerar 4 variacoes de copy via Mestre dos Prompts
-        const variations = await generateCopyVariations(briefing, style, apiKey);
+        // Prompt personalizado tem prioridade sobre briefing/estilo
+        const userPrompt = String(block.data?.customPrompt || '').trim();
+        const desiredCount = Math.min(Math.max(parseInt(String(block.data?.count)) || 4, 1), 12);
+        const brief = userPrompt || `${briefing}. Tom: ${style?.tone || 'profissional'}.`;
+        const variations = await generateCopyVariations(brief, style, apiKey, desiredCount);
         if (variations[0]) useCopyInCreative(variations[0]);
         setBlocks((prev) =>
           prev.map((b): FlowBlock => (b.id === blockId ? { ...b, output: variations } : b))
@@ -1176,6 +1179,59 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                   </div>
                 )}
 
+                {block.type === 'copy-output' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[9px] font-bold uppercase text-gray-400 flex items-center gap-1">
+                        <Sparkles size={9} className="text-amber-300" /> Prompt personalizado
+                      </label>
+                      <span className="text-[8px] text-amber-400 font-mono">
+                        {(block.data.customPrompt || '').length}/800
+                      </span>
+                    </div>
+                    <textarea
+                      rows={3}
+                      maxLength={800}
+                      value={block.data.customPrompt || ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBlocks((prev) =>
+                          prev.map((b) =>
+                            b.id === block.id ? { ...b, data: { ...b.data, customPrompt: v } } : b
+                          )
+                        );
+                      }}
+                      placeholder="Ex: Crie 9 copys para classe média 30-50 anos variando os ângulos: dor do cliente, prova social, comparação, escassez, etc. Use PAS (Problema-Agitação-Solução) e termine com CTA forte."
+                      className="w-full px-2 py-1.5 rounded-md bg-black/40 border border-amber-500/30 text-white text-[10px] placeholder-gray-500 focus:border-amber-400 focus:outline-none resize-none"
+                    />
+                    <div className="flex items-center justify-between">
+                      <label className="text-[9px] font-bold uppercase text-gray-400">
+                        Quantidade (1-12)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={block.data.count ?? 4}
+                        onChange={(e) => {
+                          const v = Math.min(Math.max(parseInt(e.target.value) || 1, 1), 12);
+                          setBlocks((prev) =>
+                            prev.map((b) =>
+                              b.id === block.id ? { ...b, data: { ...b.data, count: v } } : b
+                            )
+                          );
+                        }}
+                        className="w-14 px-1.5 py-1 rounded-md bg-black/40 border border-white/10 text-white text-[10px] focus:border-amber-400 focus:outline-none"
+                      />
+                    </div>
+                    {(block.data.customPrompt || '').trim() && (
+                      <p className="text-[8px] text-amber-300 leading-tight">
+                        ✨ Prompt personalizado ativo (tem prioridade sobre briefing/estilo).
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {block.type === 'batch-output' && (
                   <div className="space-y-1">
                     <label className="block text-[9px] font-bold uppercase text-gray-400">
@@ -1703,6 +1759,7 @@ function getDefaultData(type: BlockType): any {
         { id: `copy-${Date.now()}-1`, headline: '', support: '', cta: '' },
       ],
     };
+    case 'copy-output': return { customPrompt: '', count: 4 };
     case 'batch-output': return { count: 9 };
     default: return {};
   }
@@ -1711,13 +1768,14 @@ function getDefaultData(type: BlockType): any {
 async function generateCopyVariations(
   briefing: string,
   style: any,
-  apiKey: string
+  apiKey: string,
+  count: number = 4
 ): Promise<string[]> {
   const res = await fetch('/api/master-prompt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      brief: `${briefing}. Tom: ${style?.tone || 'profissional'}.`,
+      brief: briefing,
       type: 'copy',
       apiKey,
     }),
@@ -1736,7 +1794,7 @@ async function generateCopyVariations(
     throw new Error('A IA respondeu em um formato inesperado. Tente gerar novamente.');
   }
 
-  return lines.slice(0, 4);
+  return lines.slice(0, count);
 }
 
 async function generateImage(
