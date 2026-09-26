@@ -270,21 +270,49 @@ export function buildDirectedPrompt(input: DirectedPromptInput): DirectedPromptR
   const style = input.style && STYLE_MODIFIERS[input.style] ? STYLE_MODIFIERS[input.style] : '';
 
   const briefing = (input.briefing || '').trim();
-  const dirBlock = direction
+
+  // Se o usuario ja passou um prompt detalhado (>= 150 chars),
+  // passa o briefing LITERALMENTE sem adicionar camadas extras
+  // que poderiam contradizer ou poluir o resultado.
+  const isDetailedBriefing = briefing.length >= 150;
+
+  const dirBlock = direction && !isDetailedBriefing
     ? `${direction.composition}, ${direction.lighting}`
     : '';
-  const moodBlock = direction ? direction.mood : '';
-  const catBlock = visualCat ? visualCat.promptFragment : '';
-  const typographyBlock = direction ? direction.typographyMood : '';
-  const personBlock = input.personPhoto
+  const moodBlock = direction && !isDetailedBriefing ? direction.mood : '';
+  const catBlock = visualCat && !isDetailedBriefing ? visualCat.promptFragment : '';
+  const typographyBlock = direction && !isDetailedBriefing ? direction.typographyMood : '';
+  const personBlock = input.personPhoto && !isDetailedBriefing
     ? 'featuring the same person from the reference photo, preserving facial identity, clothing style and overall mood'
     : '';
-  const brandBlock = input.brandColors
+  const brandBlock = input.brandColors && !isDetailedBriefing
     ? `color palette anchored on ${input.brandColors}`
     : '';
-  const styleBlock = style ? `, ${style}` : '';
+  const styleBlock = style && !isDetailedBriefing ? `, ${style}` : '';
 
-  // Monta prompt composto: Briefing → Categoria Visual → Direção → Lighting → Mood → Personagem → Marca → Acabamento
+  // Se o briefing ja' e' detalhado, passa ele puro para a IA sem modificacoes.
+  // Apenas adiciona instrucoes de "no text" para a tipografia nao ser renderizada pela IA
+  if (isDetailedBriefing) {
+    const prompt = [
+      briefing,
+      'IMPORTANT: Do NOT add any text, words, letters, numbers or watermarks to the image. Typography will be overlaid separately.',
+    ].filter(Boolean).join('. ');
+    return {
+      prompt,
+      blocks: {
+        briefing,
+        visualCategory: '',
+        direction: '',
+        lighting: '',
+        mood: '',
+        style: '',
+        personPhoto: '',
+        typographyMood: '',
+      },
+    };
+  }
+
+  // Para briefings curtos ou vazios, aplicar enhancer completo
   const prompt = [
     briefing && `BRIEFING: ${briefing}`,
     catBlock,
