@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BrandKit } from '@/types';
+import { BrandKit, LocalFont } from '@/types';
 import {
   Palette,
   Check,
@@ -23,6 +23,7 @@ interface BrandKitModalProps {
   isOpen: boolean;
   onClose: () => void;
   brands: BrandKit[];
+  localFonts: LocalFont[];
   activeBrandId: string;
   onSelectBrand: (id: string) => void;
   onSaveBrand: (brand: BrandKit) => void;
@@ -66,6 +67,19 @@ const TONE_OPTIONS = [
   { value: 'casual', label: '😄 Casual' },
   { value: 'luxo', label: '👑 Luxo' },
 ];
+
+const buildFontOptions = (defaults: string[], localFonts: LocalFont[], currentFont: string) => {
+  const options = new Map<string, string>();
+  defaults.forEach((family) => options.set(family, family));
+  localFonts.forEach((font) => {
+    const family = font.family.trim();
+    if (family && !options.has(family)) options.set(family, `${family} · Importada`);
+  });
+  if (currentFont && !options.has(currentFont)) {
+    options.set(currentFont, `${currentFont} · Fonte salva`);
+  }
+  return Array.from(options, ([value, label]) => ({ value, label }));
+};
 
 type BrandFieldChange = (field: keyof BrandKit, value: BrandKit[keyof BrandKit]) => void;
 
@@ -153,6 +167,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
   isOpen,
   onClose,
   brands,
+  localFonts,
   activeBrandId,
   onSelectBrand,
   onSaveBrand,
@@ -184,6 +199,17 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
     editingBrand || brands.find((b) => b.id === activeBrandId) || brands[0];
 
   if (!currentBrand) return null;
+
+  const headlineFontOptions = buildFontOptions(
+    FONT_OPTIONS_HEADLINE,
+    localFonts,
+    currentBrand.fontHeadline
+  );
+  const bodyFontOptions = buildFontOptions(
+    FONT_OPTIONS_BODY,
+    localFonts,
+    currentBrand.fontBody
+  );
 
   const handleCreateNew = () => {
     const newBrand: BrandKit = {
@@ -447,7 +473,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
                   field="fontHeadline"
                   label="Fonte dos Títulos (Headline)"
                   icon={Type}
-                  options={FONT_OPTIONS_HEADLINE.map((f) => ({ value: f, label: f }))}
+                  options={headlineFontOptions}
                 />
                 <SelectField
                   brand={currentBrand}
@@ -455,11 +481,11 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
                   field="fontBody"
                   label="Fonte do Corpo"
                   icon={Type}
-                  options={FONT_OPTIONS_BODY.map((f) => ({ value: f, label: f }))}
+                  options={bodyFontOptions}
                 />
               </div>
               <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">
-                💡 Você também pode importar fontes .TTF/.OTF/.WOFF/.WOFF2 do seu PC na aba <strong className="text-emerald-300">Fontes</strong>.
+                💡 Importe arquivos .TTF/.OTF/.WOFF/.WOFF2 na aba <strong className="text-emerald-300">Fontes</strong>. Eles aparecerão aqui com o selo <strong className="text-brand-300">Importada</strong>.
               </p>
             </div>
 

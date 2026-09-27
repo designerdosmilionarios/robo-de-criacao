@@ -914,6 +914,7 @@ export default function Home() {
         isOpen={isBrandModalOpen}
         onClose={() => setIsBrandModalOpen(false)}
         brands={brands}
+        localFonts={localFonts}
         activeBrandId={activeBrandId}
         onSelectBrand={(id) => setActiveBrandId(id)}
         onSaveBrand={(updated) => {
