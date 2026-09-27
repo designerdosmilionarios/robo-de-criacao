@@ -206,6 +206,11 @@ export interface SavedSingleImageData {
   generatedGallery: string[];
   editMode?: 'auto' | 'free';
   freeLayers?: Array<Record<string, unknown>>;
+  headlineFormatting?: { bold: string[]; italic: string[] };
+  highlightFormatting?: { bold: string[]; italic: string[] };
+  sublineFormatting?: { bold: string[]; italic: string[] };
+  ctaFormatting?: { bold: string[]; italic: string[] };
+  additionalTextLayers?: Array<Record<string, unknown>>;
   selectedModel?: string;
   // =========================================
   // Direção artística (paridade com carrossel)

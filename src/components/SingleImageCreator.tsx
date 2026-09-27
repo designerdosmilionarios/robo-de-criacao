@@ -28,6 +28,7 @@ import {
   Save,
   RefreshCw,
   Type,
+  Plus,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import saveAs from 'file-saver';
@@ -50,8 +51,30 @@ import {
   PsdNativeTextLayer,
 } from '@/lib/psdExport';
 import { TextGradientOverlay, buildOverlayStyle, DEFAULT_OVERLAY, GradientOverlayConfig } from '@/components/TextGradientOverlay';
+import {
+  RichTextInput,
+  RichTextFormatting,
+  EMPTY_RICH_TEXT,
+  renderRichText,
+} from '@/components/RichTextInput';
 
 const SUPPORTED_IMAGE_MODELS = ['auto', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2'];
+
+interface AdditionalTextLayer {
+  id: string;
+  name: string;
+  text: string;
+  formatting: RichTextFormatting;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fontWeight: string;
+  fontFamily: string;
+  color: string;
+  textAlign: 'left' | 'center' | 'right';
+  visible: boolean;
+}
 
 interface SingleImageCreatorProps {
   brand: BrandKit;
@@ -205,6 +228,43 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
   const [showCta, setShowCta] = usePersistedState<boolean>('single_show_cta', true);
   const [headlineFont, setHeadlineFont] = usePersistedState<string>('single_headline_font', brand.fontHeadline);
   const [textAlignment, setTextAlignment] = usePersistedState<'left' | 'center'>('single_text_align', 'left');
+  const [headlineFormatting, setHeadlineFormatting] = usePersistedState<RichTextFormatting>('single_headline_formatting', EMPTY_RICH_TEXT);
+  const [highlightFormatting, setHighlightFormatting] = usePersistedState<RichTextFormatting>('single_highlight_formatting', EMPTY_RICH_TEXT);
+  const [sublineFormatting, setSublineFormatting] = usePersistedState<RichTextFormatting>('single_subline_formatting', EMPTY_RICH_TEXT);
+  const [ctaFormatting, setCtaFormatting] = usePersistedState<RichTextFormatting>('single_cta_formatting', EMPTY_RICH_TEXT);
+  const [additionalTextLayers, setAdditionalTextLayers] = usePersistedState<AdditionalTextLayer[]>('single_additional_text_layers', []);
+
+  const addTextLayer = () => {
+    const index = additionalTextLayers.length + 1;
+    setAdditionalTextLayers((current) => [
+      ...current,
+      {
+        id: `extra-text-${Date.now()}`,
+        name: `Texto extra ${index}`,
+        text: 'Novo texto',
+        formatting: { bold: [], italic: [] },
+        x: 50,
+        y: Math.min(88, 58 + current.length * 8),
+        width: 70,
+        fontSize: 24,
+        fontWeight: '400',
+        fontFamily: brand.fontBody,
+        color: brand.textColor,
+        textAlign: 'center',
+        visible: true,
+      },
+    ]);
+  };
+
+  const updateTextLayer = (id: string, patch: Partial<AdditionalTextLayer>) => {
+    setAdditionalTextLayers((current) =>
+      current.map((layer) => (layer.id === id ? { ...layer, ...patch } : layer))
+    );
+  };
+
+  const removeTextLayer = (id: string) => {
+    setAdditionalTextLayers((current) => current.filter((layer) => layer.id !== id));
+  };
 
   // CONFIGURACOES TIPOGRAFICAS AVANCADAS (um TypographyConfig por texto) - PERSISTIDAS
   const [tagConfig, setTagConfig] = usePersistedState<TypographyConfig>('single_tag_config_full', {
@@ -306,6 +366,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         generatedGallery,
         editMode,
         selectedModel,
+        headlineFormatting,
+        highlightFormatting,
+        sublineFormatting,
+        ctaFormatting,
+        additionalTextLayers,
       },
       load: (data: any) => {
         if (data.format) setFormat(data.format);
@@ -352,6 +417,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         if (Array.isArray(data.generatedGallery)) setGeneratedGallery(data.generatedGallery);
         if (data.editMode === 'auto' || data.editMode === 'free') setEditMode(data.editMode);
         if (typeof data.selectedModel === 'string') setSelectedModel(data.selectedModel);
+        if (data.headlineFormatting) setHeadlineFormatting(data.headlineFormatting);
+        if (data.highlightFormatting) setHighlightFormatting(data.highlightFormatting);
+        if (data.sublineFormatting) setSublineFormatting(data.sublineFormatting);
+        if (data.ctaFormatting) setCtaFormatting(data.ctaFormatting);
+        if (Array.isArray(data.additionalTextLayers)) setAdditionalTextLayers(data.additionalTextLayers);
       },
     });
   }, [
@@ -400,6 +470,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
     generatedGallery,
     editMode,
     selectedModel,
+    headlineFormatting,
+    highlightFormatting,
+    sublineFormatting,
+    ctaFormatting,
+    additionalTextLayers,
   ]);
 
   // Sincronizar imagem externa enviada do Estúdio de Poses
@@ -721,7 +796,10 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
       await withCleanExportCanvas(async (element) => {
         const finalDataUrl = await captureCanvasPng(element);
         const finalCanvas = await dataUrlToCanvas(finalDataUrl, currentFormat.width, currentFormat.height);
-        const layerDefinitions = [
+        const layerDefinitions: Array<[string, string]> = [
+          ...additionalTextLayers
+            .filter((layer) => layer.visible && layer.text)
+            .map((layer): [string, string] => [layer.id, `Texto extra / ${layer.name}`]),
           ['cta', 'CTA / Botão'],
           ['subline', 'Texto / Subtítulo'],
           ['highlight', 'Texto / Destaque'],
@@ -734,7 +812,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           ['brand-glows', 'Glows da marca'],
           ['contrast-overlay', 'Contraste do fundo'],
           ['background', 'Fundo'],
-        ] as const;
+        ];
 
         const layers = [];
         for (const [id, name] of layerDefinitions) {
@@ -777,6 +855,21 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         config: ctaConfig,
         color: ctaConfig.highlightEnabled ? ctaConfig.highlightColor : brand.backgroundColor,
       },
+      ...additionalTextLayers.map((layer) => ({
+        id: layer.id,
+        name: `Texto nativo / ${layer.name}`,
+        text: layer.text,
+        config: {
+          ...DEFAULT_TYPOGRAPHY,
+          visible: layer.visible,
+          fontFamily: layer.fontFamily,
+          fontSize: layer.fontSize,
+          fontWeight: layer.fontWeight as TypographyConfig['fontWeight'],
+          color: layer.color,
+          textAlign: layer.textAlign,
+        },
+        color: layer.color,
+      })),
     ];
 
     return definitions.flatMap(({ id, name, text, config, color }) => {
@@ -1217,7 +1310,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                           }px`,
                         }}
                       >
-                        {headline}
+                        {renderRichText(headline, headlineFormatting)}
                       </h1>
                     )}
 
@@ -1248,7 +1341,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                           maxWidth: '90%',
                         }}
                       >
-                        {highlightText}
+                        {renderRichText(highlightText, highlightFormatting)}
                       </p>
                     )}
 
@@ -1280,7 +1373,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                           width: sublineConfig.highlightEnabled ? 'fit-content' : 'auto',
                         }}
                       >
-                        {subline}
+                        {renderRichText(subline, sublineFormatting)}
                       </p>
                     )}
 
@@ -1316,11 +1409,38 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                           }}
                         >
                           <MousePointerClick size={Math.max(12, ctaConfig.fontSize * 0.9)} />
-                          {ctaText}
+                          {renderRichText(ctaText, ctaFormatting)}
                         </span>
                       </div>
                     )}
                   </div>
+
+                  {additionalTextLayers
+                    .filter((layer) => layer.visible && layer.text)
+                    .map((layer) => (
+                      <div
+                        key={layer.id}
+                        data-psd-layer={layer.id}
+                        data-psd-native-text={layer.id}
+                        className="absolute whitespace-pre-wrap"
+                        style={{
+                          left: `${layer.x}%`,
+                          top: `${layer.y}%`,
+                          width: `${layer.width}%`,
+                          transform: 'translate(-50%, -50%)',
+                          zIndex: 35,
+                          fontFamily: layer.fontFamily,
+                          fontSize: `${layer.fontSize}px`,
+                          fontWeight: layer.fontWeight,
+                          color: layer.color,
+                          textAlign: layer.textAlign,
+                          lineHeight: 1.15,
+                          textShadow: '0 2px 10px rgba(0,0,0,.55)',
+                        }}
+                      >
+                        {renderRichText(layer.text, layer.formatting)}
+                      </div>
+                    ))}
                 </div>
                 </div>
               )}
@@ -2273,10 +2393,11 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             />
 
             {/* HEADLINE */}
-            <textarea
-              rows={2}
+            <RichTextInput
               value={headline}
-              onChange={(e) => setHeadline(e.target.value)}
+              onChange={setHeadline}
+              formatting={headlineFormatting}
+              onFormattingChange={setHeadlineFormatting}
               placeholder="COMO DOBRAR SUAS CONVERSÕES NO META ADS"
               className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:border-brand-500 focus:outline-none resize-none"
             />
@@ -2291,13 +2412,13 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             />
 
             {/* FRASE DE DESTAQUE */}
-            <textarea
-              rows={2}
+            <RichTextInput
               value={highlightText}
-              onChange={(e) => setHighlightText(e.target.value)}
+              onChange={setHighlightText}
+              formatting={highlightFormatting}
+              onFormattingChange={setHighlightFormatting}
               placeholder="Sem gastar mais em tráfego"
-              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold focus:border-brand-500 focus:outline-none resize-none"
-              style={{ color: brand.primaryColor }}
+              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-brand-300 focus:border-brand-500 focus:outline-none resize-none"
             />
             <TypographyControl
               label="Frase de Destaque"
@@ -2310,12 +2431,14 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             />
 
             {/* SUBTITULO */}
-            <input
-              type="text"
+            <RichTextInput
+              rows={1}
               value={subline}
-              onChange={(e) => setSubline(e.target.value)}
+              onChange={setSubline}
+              formatting={sublineFormatting}
+              onFormattingChange={setSublineFormatting}
               placeholder="Aprenda o passo a passo validado por especialistas."
-              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs focus:border-brand-500 focus:outline-none"
+              className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs focus:border-brand-500 focus:outline-none resize-none"
             />
             <TypographyControl
               label="Subtítulo"
@@ -2328,16 +2451,19 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
             />
 
             {/* CTA */}
-            <div className="flex items-center justify-between">
-              <input
-                type="text"
-                value={ctaText}
-                onChange={(e) => setCtaText(e.target.value)}
-                placeholder="QUERO APRENDER AGORA"
-                className="flex-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none"
-                disabled={!showCta}
-              />
-              <label className="inline-flex items-center gap-1.5 px-2 cursor-pointer ml-2">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <RichTextInput
+                  rows={1}
+                  value={ctaText}
+                  onChange={setCtaText}
+                  formatting={ctaFormatting}
+                  onFormattingChange={setCtaFormatting}
+                  placeholder="QUERO APRENDER AGORA"
+                  className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-brand-500 focus:outline-none resize-none"
+                />
+              </div>
+              <label className="inline-flex items-center gap-1.5 px-2 py-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={showCta}
@@ -2358,6 +2484,126 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
                 brandBodyFont={brand.fontBody}
               />
             )}
+
+            <div className="space-y-3 border-t border-white/10 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-white">Áreas adicionais de texto</h4>
+                  <p className="text-[9px] text-gray-500">Crie textos livres e posicione cada camada no criativo.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addTextLayer}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-[10px] font-bold text-brand-300 hover:bg-brand-500/20"
+                >
+                  <Plus size={13} /> Adicionar texto
+                </button>
+              </div>
+
+              {additionalTextLayers.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-[10px] text-gray-500">
+                  Nenhuma área adicional criada.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {additionalTextLayers.map((layer) => (
+                    <div key={layer.id} className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={layer.name}
+                          onChange={(event) => updateTextLayer(layer.id, { name: event.target.value })}
+                          className="min-w-0 flex-1 bg-transparent text-[11px] font-bold text-white outline-none"
+                          aria-label="Nome da camada"
+                        />
+                        <label className="flex items-center gap-1 text-[9px] text-gray-400">
+                          <input
+                            type="checkbox"
+                            checked={layer.visible}
+                            onChange={(event) => updateTextLayer(layer.id, { visible: event.target.checked })}
+                            className="accent-brand-500"
+                          />
+                          Visível
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeTextLayer(layer.id)}
+                          className="rounded-lg p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+                          title="Excluir camada"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      <RichTextInput
+                        value={layer.text}
+                        onChange={(text) => updateTextLayer(layer.id, { text })}
+                        formatting={layer.formatting}
+                        onFormattingChange={(formatting) => updateTextLayer(layer.id, { formatting })}
+                        placeholder="Digite o texto adicional"
+                        className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-brand-500"
+                      />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={layer.fontFamily}
+                          onChange={(event) => updateTextLayer(layer.id, { fontFamily: event.target.value })}
+                          className="rounded-lg border border-white/10 bg-[#11131a] px-2 py-1.5 text-[10px] text-white"
+                        >
+                          {Array.from(new Set([brand.fontHeadline, brand.fontBody, ...localFonts.map((font) => font.family)])).map((family) => (
+                            <option key={family} value={family}>{family}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={layer.fontWeight}
+                          onChange={(event) => updateTextLayer(layer.id, { fontWeight: event.target.value })}
+                          className="rounded-lg border border-white/10 bg-[#11131a] px-2 py-1.5 text-[10px] text-white"
+                        >
+                          {['300', '400', '500', '600', '700', '800', '900'].map((weight) => (
+                            <option key={weight} value={weight}>Peso {weight}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="space-y-1 text-[9px] text-gray-500">
+                          <span>X · {layer.x}%</span>
+                          <input type="range" min="5" max="95" value={layer.x} onChange={(event) => updateTextLayer(layer.id, { x: Number(event.target.value) })} className="w-full accent-brand-500" />
+                        </label>
+                        <label className="space-y-1 text-[9px] text-gray-500">
+                          <span>Y · {layer.y}%</span>
+                          <input type="range" min="5" max="95" value={layer.y} onChange={(event) => updateTextLayer(layer.id, { y: Number(event.target.value) })} className="w-full accent-brand-500" />
+                        </label>
+                        <label className="space-y-1 text-[9px] text-gray-500">
+                          <span>Largura · {layer.width}%</span>
+                          <input type="range" min="15" max="95" value={layer.width} onChange={(event) => updateTextLayer(layer.id, { width: Number(event.target.value) })} className="w-full accent-brand-500" />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-[1fr_auto] gap-3">
+                        <label className="space-y-1 text-[9px] text-gray-500">
+                          <span>Tamanho · {layer.fontSize}px</span>
+                          <input type="range" min="10" max="96" value={layer.fontSize} onChange={(event) => updateTextLayer(layer.id, { fontSize: Number(event.target.value) })} className="w-full accent-brand-500" />
+                        </label>
+                        <input type="color" value={layer.color} onChange={(event) => updateTextLayer(layer.id, { color: event.target.value })} className="mt-4 h-8 w-10 cursor-pointer bg-transparent" aria-label="Cor da camada" />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['left', 'center', 'right'] as const).map((alignment) => (
+                          <button
+                            key={alignment}
+                            type="button"
+                            onClick={() => updateTextLayer(layer.id, { textAlign: alignment })}
+                            className={`rounded-lg py-1.5 text-[9px] font-bold ${layer.textAlign === alignment ? 'bg-brand-500 text-dark-900' : 'bg-white/5 text-gray-400'}`}
+                          >
+                            {alignment === 'left' ? 'Esquerda' : alignment === 'center' ? 'Centro' : 'Direita'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
