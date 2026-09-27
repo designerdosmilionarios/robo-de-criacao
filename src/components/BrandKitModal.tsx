@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BrandKit } from '@/types';
 import {
   Palette,
@@ -17,6 +17,7 @@ import {
   Eye,
   Save,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface BrandKitModalProps {
   isOpen: boolean;
@@ -66,6 +67,88 @@ const TONE_OPTIONS = [
   { value: 'luxo', label: '👑 Luxo' },
 ];
 
+type BrandFieldChange = (field: keyof BrandKit, value: BrandKit[keyof BrandKit]) => void;
+
+const ColorField: React.FC<{
+  brand: BrandKit;
+  field: keyof BrandKit;
+  label: string;
+  onChange: BrandFieldChange;
+}> = ({ brand, field, label, onChange }) => {
+  const value = String(brand[field] || '');
+  const pickerValue = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000';
+  return (
+    <div>
+      <label className="block text-[11px] text-gray-300 mb-1.5">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={pickerValue}
+          onChange={(event) => onChange(field, event.target.value)}
+          className="w-10 h-8 rounded-lg cursor-pointer bg-transparent border-0"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(event) => onChange(field, event.target.value)}
+          maxLength={7}
+          spellCheck={false}
+          className="flex-1 px-2 py-1 text-[11px] rounded bg-white/5 border border-white/10 text-white uppercase font-mono focus:border-brand-500 focus:outline-none"
+        />
+      </div>
+    </div>
+  );
+};
+
+const TextField: React.FC<{
+  brand: BrandKit;
+  field: keyof BrandKit;
+  label: string;
+  icon: LucideIcon;
+  placeholder?: string;
+  onChange: BrandFieldChange;
+}> = ({ brand, field, label, icon: Icon, placeholder, onChange }) => (
+  <div>
+    <label className="mb-1.5 flex items-center gap-1.5 text-[11px] text-gray-300">
+      <Icon size={13} /> {label}
+    </label>
+    <input
+      type="text"
+      value={String(brand[field] || '')}
+      onChange={(event) => onChange(field, event.target.value)}
+      placeholder={placeholder}
+      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-brand-500 focus:outline-none"
+    />
+  </div>
+);
+
+const SelectField: React.FC<{
+  brand: BrandKit;
+  field: keyof BrandKit;
+  label: string;
+  icon: LucideIcon;
+  options: { value: string; label: string }[];
+  onChange: BrandFieldChange;
+}> = ({ brand, field, label, icon: Icon, options, onChange }) => (
+  <div>
+    <label className="mb-1.5 flex items-center gap-1.5 text-[11px] text-gray-300">
+      <Icon size={13} /> {label}
+    </label>
+    <select
+      value={String(brand[field] || '')}
+      onChange={(event) => onChange(field, event.target.value)}
+      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-brand-500 focus:outline-none"
+    >
+      <option value="" className="bg-[#11131a]">Selecione...</option>
+      {options.map((option) => (
+        <option key={option.value} value={option.value} className="bg-[#11131a]">
+          {option.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
 export const BrandKitModal: React.FC<BrandKitModalProps> = ({
   isOpen,
   onClose,
@@ -77,6 +160,23 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
 }) => {
   const [editingBrand, setEditingBrand] = useState<BrandKit | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const saveBrandRef = useRef(onSaveBrand);
+
+  useEffect(() => {
+    saveBrandRef.current = onSaveBrand;
+  }, [onSaveBrand]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const selected = brands.find((brand) => brand.id === activeBrandId) || brands[0] || null;
+    setEditingBrand(selected);
+  }, [isOpen, activeBrandId]);
+
+  useEffect(() => {
+    if (!editingBrand) return;
+    const timeout = window.setTimeout(() => saveBrandRef.current(editingBrand), 300);
+    return () => window.clearTimeout(timeout);
+  }, [editingBrand]);
 
   if (!isOpen) return null;
 
@@ -117,7 +217,11 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
   const handleFieldChange = <K extends keyof BrandKit>(field: K, value: BrandKit[K]) => {
     const updated = { ...currentBrand, [field]: value };
     setEditingBrand(updated);
-    onSaveBrand(updated);
+  };
+
+  const handleClose = () => {
+    if (editingBrand) onSaveBrand(editingBrand);
+    onClose();
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,90 +233,6 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
     };
     reader.readAsDataURL(file);
   };
-
-  // Render field de cor (label + picker + input)
-  const ColorField = ({
-    field,
-    label,
-  }: {
-    field: keyof BrandKit;
-    label: string;
-  }) => (
-    <div>
-      <label className="block text-[11px] text-gray-300 mb-1.5">{label}</label>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={(currentBrand[field] as string) || '#000000'}
-          onChange={(e) => handleFieldChange(field, e.target.value as any)}
-          className="w-10 h-8 rounded-lg cursor-pointer bg-transparent border-0"
-        />
-        <input
-          type="text"
-          value={(currentBrand[field] as string) || ''}
-          onChange={(e) => handleFieldChange(field, e.target.value as any)}
-          className="flex-1 px-2 py-1 text-[11px] rounded bg-white/5 border border-white/10 text-white uppercase font-mono"
-        />
-      </div>
-    </div>
-  );
-
-  // Render text field
-  const TextField = ({
-    field,
-    label,
-    icon: Icon,
-    placeholder,
-  }: {
-    field: keyof BrandKit;
-    label: string;
-    icon: any;
-    placeholder?: string;
-  }) => (
-    <div>
-      <label className="block text-[11px] text-gray-300 mb-1.5 flex items-center gap-1.5">
-        {Icon && <Icon size={13} />} {label}
-      </label>
-      <input
-        type="text"
-        value={(currentBrand[field] as string) || ''}
-        onChange={(e) => handleFieldChange(field, e.target.value as any)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-brand-500 focus:outline-none"
-      />
-    </div>
-  );
-
-  // Render select field
-  const SelectField = ({
-    field,
-    label,
-    icon: Icon,
-    options,
-  }: {
-    field: keyof BrandKit;
-    label: string;
-    icon: any;
-    options: { value: string; label: string }[];
-  }) => (
-    <div>
-      <label className="block text-[11px] text-gray-300 mb-1.5 flex items-center gap-1.5">
-        {Icon && <Icon size={13} />} {label}
-      </label>
-      <select
-        value={(currentBrand[field] as string) || ''}
-        onChange={(e) => handleFieldChange(field, e.target.value as any)}
-        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none"
-      >
-        <option value="" className="bg-[#11131a]">Selecione...</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-[#11131a]">
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -231,7 +251,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 text-gray-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-all"
           >
             ✕
@@ -342,12 +362,16 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <TextField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="segment"
                   label="Segmento / Nicho"
                   icon={Tag}
                   placeholder="Ex: Moda Feminina, SaaS B2B..."
                 />
                 <TextField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="slogan"
                   label="Slogan / Tagline"
                   icon={MessageSquare}
@@ -356,12 +380,16 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <TextField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="website"
                   label="Website"
                   icon={Globe}
                   placeholder="https://cliente.com.br"
                 />
                 <TextField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="email"
                   label="E-mail de Contato"
                   icon={Mail}
@@ -370,6 +398,8 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
               </div>
               <div className="mt-3">
                 <TextField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="phone"
                   label="WhatsApp / Telefone"
                   icon={Phone}
@@ -384,12 +414,12 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
                 <Palette size={13} /> Paleta de Cores Principal
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <ColorField field="primaryColor" label="🟢 Primária (Destaque)" />
-                <ColorField field="secondaryColor" label="🔵 Secundária" />
-                <ColorField field="backgroundColor" label="⚫ Fundo (Background)" />
-                <ColorField field="cardColor" label="🟦 Cards" />
-                <ColorField field="textColor" label="⚪ Texto Principal" />
-                <ColorField field="accentTextColor" label="🔘 Texto Apoio" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="primaryColor" label="🟢 Primária (Destaque)" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="secondaryColor" label="🔵 Secundária" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="backgroundColor" label="⚫ Fundo (Background)" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="cardColor" label="🟦 Cards" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="textColor" label="⚪ Texto Principal" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="accentTextColor" label="🔘 Texto Apoio" />
               </div>
             </div>
 
@@ -399,9 +429,9 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
                 <Sparkles size={13} /> Cores Semânticas (status / feedback)
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <ColorField field="successColor" label="✓ Sucesso" />
-                <ColorField field="warningColor" label="⚠ Atenção" />
-                <ColorField field="errorColor" label="✕ Erro" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="successColor" label="✓ Sucesso" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="warningColor" label="⚠ Atenção" />
+                <ColorField brand={currentBrand} onChange={handleFieldChange as BrandFieldChange} field="errorColor" label="✕ Erro" />
               </div>
             </div>
 
@@ -412,12 +442,16 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SelectField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="fontHeadline"
                   label="Fonte dos Títulos (Headline)"
                   icon={Type}
                   options={FONT_OPTIONS_HEADLINE.map((f) => ({ value: f, label: f }))}
                 />
                 <SelectField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="fontBody"
                   label="Fonte do Corpo"
                   icon={Type}
@@ -436,12 +470,16 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SelectField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="tone"
                   label="Tom de comunicação"
                   icon={MessageSquare}
                   options={TONE_OPTIONS}
                 />
                 <SelectField
+                  brand={currentBrand}
+                  onChange={handleFieldChange as BrandFieldChange}
                   field="style"
                   label="Estilo visual"
                   icon={Eye}
@@ -472,7 +510,7 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({
 
         <div className="mt-8 pt-6 border-t border-white/10 flex justify-end">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-6 py-2.5 rounded-xl font-bold text-sm bg-brand-500 text-dark-900 hover:bg-brand-400 transition-all shadow-lg"
           >
             Pronto / Fechar
