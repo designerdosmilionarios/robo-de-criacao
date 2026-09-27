@@ -26,6 +26,7 @@ export interface PsdNativeTextLayer {
   letterSpacing: number;
   uppercase: boolean;
   underline: boolean;
+  formatting?: { bold: string[]; italic: string[] };
 }
 
 export async function dataUrlToCanvas(
@@ -133,6 +134,47 @@ function createNativeTextLayer(
 ): Layer {
   const rgb = parseHexColor(spec.color);
   const content = spec.uppercase ? spec.text.toUpperCase() : spec.text;
+
+  // Quando ha formatting (bold/italic por trecho), geramos um Layer com runs
+  // para que o Photoshop respeite o destaque de cada palavra individualmente.
+  if (spec.formatting && (spec.formatting.bold.length > 0 || spec.formatting.italic.length > 0)) {
+    const segments = splitTextWithFormatting(content, spec.formatting);
+    const baseWeight = Number(spec.fontWeight) || 400;
+    return {
+      name: spec.name,
+      hidden: false,
+      canvas: previewCanvas,
+      text: {
+        text: segments.map((s) => s.text).join(''),
+        transform: [1, 0, 0, 1, spec.x, spec.y],
+        shapeType: 'box',
+        boxBounds: [0, 0, Math.max(1, spec.width), Math.max(1, spec.height)],
+        style: {
+          font: { name: spec.fontFamily || 'ArialMT' },
+          fontSize: spec.fontSize,
+          leading: spec.fontSize * spec.lineHeight,
+          tracking: spec.letterSpacing,
+          underline: spec.underline,
+          fillColor: { r: rgb.r, g: rgb.g, b: rgb.b },
+        },
+        paragraphStyle: {
+          justification: spec.textAlign,
+        },
+        // Runs do texto com peso e estilo individualizados
+        ...(segments.length > 1 && {
+          runs: segments.map((s) => ({
+            text: s.text,
+            style: {
+              fontSize: spec.fontSize,
+              fauxBold: s.bold || baseWeight >= 700,
+              fauxItalic: s.italic,
+            },
+          })),
+        }),
+      },
+    };
+  }
+
   return {
     name: spec.name,
     hidden: false,
@@ -156,6 +198,49 @@ function createNativeTextLayer(
       },
     },
   };
+}
+
+// Divide o texto em segmentos respeitando bold/italic por trecho
+function splitTextWithFormatting(
+  text: string,
+  formatting: { bold: string[]; italic: string[] }
+): Array<{ text: string; bold: boolean; italic: boolean }> {
+  const bold = new Set(formatting.bold.filter(Boolean));
+  const italic = new Set(formatting.italic.filter(Boolean));
+  const boldArr: string[] = Array.from(bold);
+  const italicArr: string[] = Array.from(italic);
+
+  // Pontos de quebra: inicio/fim de cada palavra com formatacao
+  const breakpoints = new Set<number>([0, text.length]);
+  const applyBreaks = (arr: string[]) => {
+    for (let i = 0; i < arr.length; i += 1) {
+      const phrase = arr[i];
+      if (!phrase) continue;
+      let from = 0;
+      while (from < text.length) {
+        const idx = text.indexOf(phrase, from);
+        if (idx < 0) break;
+        breakpoints.add(idx);
+        breakpoints.add(idx + phrase.length);
+        from = idx + phrase.length;
+      }
+    }
+  };
+  applyBreaks(boldArr);
+  applyBreaks(italicArr);
+
+  const points = Array.from(breakpoints).sort((a, b) => a - b);
+  const segments: Array<{ text: string; bold: boolean; italic: boolean }> = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const start = points[i];
+    const end = points[i + 1];
+    const slice = text.slice(start, end);
+    if (!slice) continue;
+    const isBold = boldArr.some((phrase) => slice === phrase || (slice.startsWith(phrase) && end - start >= phrase.length));
+    const isItalic = italicArr.some((phrase) => slice === phrase || (slice.startsWith(phrase) && end - start >= phrase.length));
+    segments.push({ text: slice, bold: isBold, italic: isItalic });
+  }
+  return segments.length > 0 ? segments : [{ text, bold: false, italic: false }];
 }
 
 async function writeAndDownloadPsd(psd: Psd, fileName: string): Promise<void> {

@@ -98,25 +98,24 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 };
 
 export function renderRichText(text: string, formatting?: RichTextFormatting) {
+  if (!text) return text;
   if (!formatting || (!formatting.bold.length && !formatting.italic.length)) return text;
   const chars = text.split('').map((character) => ({ character, bold: false, italic: false }));
 
-  const markPhrases = (phrases: string[], field: 'bold' | 'italic') => {
+  // IMPORTANTE: marca apenas a PRIMEIRA ocorrencia de cada frase para evitar
+  // que a mesma palavra fique em bold em todas as posicoes do texto.
+  const markFirstPhrase = (phrases: string[], field: 'bold' | 'italic') => {
     phrases.filter(Boolean).forEach((phrase) => {
-      let fromIndex = 0;
-      while (fromIndex < text.length) {
-        const start = text.indexOf(phrase, fromIndex);
-        if (start < 0) break;
-        for (let index = start; index < start + phrase.length && index < chars.length; index += 1) {
-          chars[index][field] = true;
-        }
-        fromIndex = start + phrase.length;
+      const start = text.indexOf(phrase);
+      if (start < 0) return;
+      for (let index = start; index < start + phrase.length && index < chars.length; index += 1) {
+        chars[index][field] = true;
       }
     });
   };
 
-  markPhrases(formatting.bold, 'bold');
-  markPhrases(formatting.italic, 'italic');
+  markFirstPhrase(formatting.bold, 'bold');
+  markFirstPhrase(formatting.italic, 'italic');
 
   const runs: Array<{ text: string; bold: boolean; italic: boolean }> = [];
   chars.forEach((entry) => {
@@ -132,8 +131,8 @@ export function renderRichText(text: string, formatting?: RichTextFormatting) {
     <span
       key={`${index}-${run.text}`}
       style={{
-        fontWeight: run.bold ? 800 : undefined,
-        fontStyle: run.italic ? 'italic' : undefined,
+        fontWeight: run.bold ? 900 : 'inherit',  // usa 900 (mais forte) para garantir visibilidade
+        fontStyle: run.italic ? 'italic' : 'normal',
       }}
     >
       {run.text}

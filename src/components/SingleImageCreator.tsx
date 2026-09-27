@@ -258,7 +258,23 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
 
   const updateTextLayer = (id: string, patch: Partial<AdditionalTextLayer>) => {
     setAdditionalTextLayers((current) =>
-      current.map((layer) => (layer.id === id ? { ...layer, ...patch } : layer))
+      current.map((layer) => {
+        if (layer.id !== id) return layer;
+        const merged = { ...layer, ...patch };
+        // Garante que a camada NAO sai do criativo.
+        // Limites: x >= 0, x + width <= 100, y >= 0, y <= 95 (espaco para o texto)
+        if (merged.x < 0) merged.x = 0;
+        if (merged.x > 100) merged.x = 100;
+        if (merged.y < 0) merged.y = 0;
+        if (merged.y > 95) merged.y = 95;
+        if (merged.width < 15) merged.width = 15;
+        if (merged.width > 100) merged.width = 100;
+        // Se x + width > 100, ajusta width
+        if (merged.x + merged.width > 100) {
+          merged.width = 100 - merged.x;
+        }
+        return merged;
+      })
     );
   };
 
@@ -869,6 +885,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
           textAlign: layer.textAlign,
         },
         color: layer.color,
+        formatting: layer.formatting,
       })),
     ];
 
@@ -894,6 +911,7 @@ export const SingleImageCreator: React.FC<SingleImageCreatorProps> = ({
         letterSpacing: config.letterSpacing * fontScale,
         uppercase: config.useUppercase,
         underline: config.useUnderline,
+        formatting: (definitions.find((d) => d.id === id) as any)?.formatting,
       }];
     });
   };
