@@ -19,7 +19,7 @@ async function callOpenAIChat(key: string, systemPrompt: string, userMessage: st
         { role: 'user', content: userMessage },
       ],
       temperature: 0.9,
-      max_tokens: 800,
+      max_tokens: 1600,
     }),
   });
   return response;
@@ -45,17 +45,19 @@ Exemplo de saida ideal:
 const buildCopySystemPrompt = (count: number) => `Voce e um diretor criativo e redator publicitario brasileiro especializado em campanhas de performance com linguagem humana, especifica e memoravel.
 
 Crie exatamente ${count} conceitos realmente distintos a partir do briefing recebido.
-Cada conceito deve ocupar uma unica linha no formato: HEADLINE | APOIO | CTA
+Cada conceito deve ocupar uma unica linha no formato: HEADLINE | APOIO | CTA | CENA VISUAL
 
 REGRAS OBRIGATORIAS:
 - HEADLINE: 4 a 7 palavras, no maximo 42 caracteres. Uma ideia forte, concreta e natural.
 - APOIO: 6 a 12 palavras, no maximo 78 caracteres. Complemente a promessa sem repetir a headline.
 - CTA: 2 a 4 palavras, no maximo 24 caracteres, sempre presente e com verbo de acao.
+- CENA VISUAL: 18 a 35 palavras em INGLES. Descreva uma unica cena concreta, fotografavel e exclusiva para a mensagem, com sujeito, acao, ambiente e enquadramento. Nao inclua textos, letras, logos, telas ou elementos genericos de marketing.
 - Use detalhes reais do briefing: publico, problema, mecanismo, produto, cidade ou resultado desejado.
 - Varie os angulos entre dor, desejo, contraste, curiosidade, prova e oportunidade.
 - Evite frases vagas como "transforme seus resultados", "alcance o sucesso", "eleve seu negocio", "solucao inovadora" e "venha fazer parte".
 - Nao invente numeros, garantias, depoimentos ou promessas que nao estejam no briefing.
 - Escreva em portugues do Brasil, sem hashtags, emojis, aspas ou ponto final na headline.
+- Cada CENA VISUAL deve ser diferente das demais e manter uma area limpa para sobreposicao da headline.
 - Nao use numeracao, marcadores, titulos, explicacoes ou markdown.`;
 
 export async function POST(req: NextRequest) {

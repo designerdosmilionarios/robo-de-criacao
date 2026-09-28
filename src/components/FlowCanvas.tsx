@@ -66,13 +66,14 @@ const canConnectBlocks = (from: FlowBlock, to: FlowBlock) => {
   return !OUTPUT_TYPES.includes(from.type);
 };
 
-const parseGeneratedCopies = (output: FlowBlock['output']) => {
+const parseGeneratedCopies = (output: FlowBlock['output'], approvedIndexes?: number[]) => {
   if (!Array.isArray(output)) return [];
   return output.flatMap((line, index) => {
+    if (Array.isArray(approvedIndexes) && !approvedIndexes.includes(index)) return [];
     if (typeof line !== 'string' || line.startsWith('data:image')) return [];
-    const [headline = '', support = '', cta = ''] = line.split('|').map((part) => part.trim());
+    const [headline = '', support = '', cta = '', visualPrompt = ''] = line.split('|').map((part) => part.trim());
     if (!headline && !support && !cta) return [];
-    return [{ id: `generated-copy-${index}`, headline, support, cta, visualPrompt: '' }];
+    return [{ id: `generated-copy-${index}`, headline, support, cta, visualPrompt }];
   });
 };
 
@@ -501,6 +502,36 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       const pairedCopies = Array.isArray(block.data?.pairedCopies) ? [...block.data.pairedCopies] : [];
       pairedCopies[index] = updatedOutput[index]?.copy || null;
       return { ...block, data: { ...block.data, pairedCopies } };
+    }));
+  };
+
+  const updateGeneratedCopy = (index: number, fieldIndex: number, value: string) => {
+    if (!outputModal || !Array.isArray(outputModal.output)) return;
+    const updatedOutput = outputModal.output.map((item: any, itemIndex: number) => {
+      if (itemIndex !== index || typeof item !== 'string') return item;
+      const fields = item.split('|').map((part) => part.trim());
+      while (fields.length < 4) fields.push('');
+      fields[fieldIndex] = value.replace(/\|/g, '-');
+      return fields.slice(0, 4).join(' | ');
+    });
+    setOutputModal({ ...outputModal, output: updatedOutput });
+    setBlocks((previous) => previous.map((item) =>
+      item.id === outputModal.blockId ? { ...item, output: updatedOutput } : item
+    ));
+  };
+
+  const toggleGeneratedCopyApproval = (index: number) => {
+    if (!outputModal || !Array.isArray(outputModal.output)) return;
+    const outputLength = outputModal.output.length;
+    setBlocks((previous) => previous.map((item) => {
+      if (item.id !== outputModal.blockId) return item;
+      const current: number[] = Array.isArray(item.data?.approvedCopyIndexes)
+        ? item.data.approvedCopyIndexes as number[]
+        : Array.from({ length: outputLength }, (_, itemIndex) => itemIndex);
+      const approvedCopyIndexes = current.includes(index)
+        ? current.filter((itemIndex) => itemIndex !== index)
+        : [...current, index].sort((a, b) => a - b);
+      return { ...item, data: { ...item.data, approvedCopyIndexes } };
     }));
   };
 
@@ -956,8 +987,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     // Copys manuais conectadas (para emparelhar Copy[i] -> Imagem[i])
     const copiesBlock = inputBlocks.find((b) => b.type === 'copies');
     const generatedCopiesBlock = inputBlocks.find((b) => b.type === 'copy-output');
+    const manualCopies = Array.isArray(copiesBlock?.data?.items) ? copiesBlock.data.items : [];
     const copiesList: Array<{ id: string; headline: string; support: string; cta?: string; visualPrompt?: string }> =
-      (copiesBlock?.data?.items || parseGeneratedCopies(generatedCopiesBlock?.output)).filter(
+      (manualCopies.length > 0
+        ? manualCopies
+        : parseGeneratedCopies(generatedCopiesBlock?.output, generatedCopiesBlock?.data?.approvedCopyIndexes)
+      ).filter(
         (c: any) => c && (c.headline?.trim() || c.support?.trim() || c.cta?.trim() || c.visualPrompt?.trim())
       );
 
@@ -987,6 +1022,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     const hasCustomCopyPrompt =
       block.type === 'copy-output' && String(block.data?.customPrompt || '').trim().length > 0;
 
+    if (generatedCopiesBlock && block.type !== 'copy-output') {
+      if (!Array.isArray(generatedCopiesBlock.output) || generatedCopiesBlock.output.length === 0) {
+        alert('Execute primeiro o node “Gerar Copy” e revise as pautas antes de gerar as imagens.');
+        return;
+      }
+      if (copiesList.length === 0) {
+        alert('Nenhuma pauta está aprovada. Abra o resultado do node de Copy e aprove pelo menos uma pauta.');
+        return;
+      }
+    }
+
     if (!briefing && requiresBriefing && !hasImageOutputsWithVisualPrompts && !hasAnyCopyVisualPrompt && !hasCustomCopyPrompt) {
       alert('Conecte um bloco "Briefing" ou preencha o campo "Prompt Visual deste bloco" (ou o "Prompt Visual" da copy) antes de gerar. Arraste da bolinha direita do Briefing para a esquerda deste bloco OU cole o prompt diretamente no bloco verde.');
       return;
@@ -1009,7 +1055,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         const variations = await generateCopyVariations(brief, style, apiKey, desiredCount);
         if (variations[0]) useCopyInCreative(variations[0]);
         setBlocks((prev) =>
-          prev.map((b): FlowBlock => (b.id === blockId ? { ...b, output: variations } : b))
+          prev.map((b): FlowBlock => (b.id === blockId
+            ? { ...b, output: variations, data: { ...b.data, approvedCopyIndexes: variations.map((_, index) => index) } }
+            : b))
         );
         setOutputModal({ blockId, output: variations });
       } else if (
@@ -2740,7 +2788,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">Resultado Gerado pela IA</h3>
               <div className="flex items-center gap-2">
-                {Array.isArray(outputModal.output) && outputModal.output.length > 1 && (
+                {Array.isArray(outputModal.output) && outputModal.output.some((item: any) =>
+                  (typeof item === 'string' && item.startsWith('data:image')) || item?.imageUrl
+                ) && (
                   <button
                     onClick={handleDownloadZip}
                     disabled={downloadingZip}
@@ -2756,7 +2806,31 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               </div>
             </div>
 
+            {blocks.find((item) => item.id === outputModal.blockId)?.type === 'copy-output' && (
+              <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-200">Revisão antes de gerar imagens</h4>
+                  <p className="mt-1 text-[10px] leading-relaxed text-gray-400">Edite os textos e a cena de cada pauta. Somente as pautas aprovadas seguirão para o Lote N.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBlocks((previous) => previous.map((item) => item.id === outputModal.blockId
+                      ? { ...item, data: { ...item.data, approvedCopyIndexes: outputModal.output.map((_: any, index: number) => index) } }
+                      : item))}
+                    className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25"
+                  >Aprovar todas</button>
+                  <button
+                    onClick={() => setBlocks((previous) => previous.map((item) => item.id === outputModal.blockId
+                      ? { ...item, data: { ...item.data, approvedCopyIndexes: [] } }
+                      : item))}
+                    className="rounded-lg bg-white/5 px-3 py-1.5 text-[10px] font-bold text-gray-300 hover:bg-white/10"
+                  >Desmarcar</button>
+                </div>
+              </div>
+            )}
+
             {/* DIRECAO DE LAYOUT + AJUSTES FINOS */}
+            {blocks.find((item) => item.id === outputModal.blockId)?.type !== 'copy-output' && (
             <div className="mb-5 p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
@@ -2860,6 +2934,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                 ))}
               </div>
             </div>
+            )}
 
             {/* SLIDERS DE POSICAO DO LOGO (X/Y/Tamanho) */}
             {logoUrlForModal && (
@@ -2929,9 +3004,19 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               <div className={outputModal.output.length === 1 ? 'mx-auto max-w-[620px]' : 'grid grid-cols-1 gap-4 lg:grid-cols-2'}>
                 {outputModal.output.map((out: any, i: number) => {
                   // Suporte ao novo formato { imageUrl, copy } OU string legado
-                  const imageUrl: string | null =
-                    typeof out === 'string' ? out : out?.imageUrl || null;
-                  const pairedCopy = typeof out === 'object' ? out?.copy : null;
+                   const imageUrl: string | null =
+                     typeof out === 'string'
+                       ? (/^(?:data:image|https?:\/\/)/.test(out) ? out : null)
+                       : out?.imageUrl || null;
+                   const pairedCopy = typeof out === 'object' ? out?.copy : null;
+                   const generatedCopyFields = typeof out === 'string' && !imageUrl
+                     ? out.split('|').map((part) => part.trim())
+                     : [];
+                   const generatedCopyBlock = blocks.find((item) => item.id === outputModal.blockId);
+                   const approvedIndexes = Array.isArray(generatedCopyBlock?.data?.approvedCopyIndexes)
+                     ? generatedCopyBlock.data.approvedCopyIndexes as number[]
+                     : outputModal.output.map((_: any, itemIndex: number) => itemIndex);
+                   const generatedCopyApproved = approvedIndexes.includes(i);
                   const headlineToShow = cleanCopyField(pairedCopy?.headline || creativeText.headline);
                   const supportToShow = cleanCopyField(pairedCopy?.support || creativeText.support);
                   const ctaToShow = cleanCopyField(pairedCopy?.cta || creativeText.cta);
@@ -3113,14 +3198,60 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                             Baixar PNG
                           </button>
                         </>
-                      ) : (
-                        <div className="space-y-3 p-3 bg-black/30">
-                          <p className="text-xs text-gray-300">{typeof out === 'string' ? out : JSON.stringify(out, null, 2)}</p>
-                          {typeof out === 'string' && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => useCopyInCreative(out)}
-                                className="flex-1 rounded-md bg-amber-400 px-2 py-1.5 text-[10px] font-black text-black hover:bg-amber-300"
+                       ) : (
+                         <div className={`space-y-3 p-3 transition-colors ${generatedCopyApproved ? 'bg-amber-500/5' : 'bg-black/40 opacity-60'}`}>
+                           {typeof out === 'string' ? (
+                             <>
+                               <div className="flex items-center justify-between gap-3">
+                                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pauta {i + 1}</span>
+                                 <label className="flex cursor-pointer items-center gap-2 text-[10px] font-bold text-gray-200">
+                                   <input
+                                     type="checkbox"
+                                     checked={generatedCopyApproved}
+                                     onChange={() => toggleGeneratedCopyApproval(i)}
+                                     className="rounded border-white/20 bg-black/40 text-emerald-500"
+                                   />
+                                   {generatedCopyApproved ? 'Aprovada' : 'Não gerar'}
+                                 </label>
+                               </div>
+                               <input
+                                 value={generatedCopyFields[0] || ''}
+                                 onChange={(event) => updateGeneratedCopy(i, 0, event.target.value)}
+                                 maxLength={60}
+                                 placeholder="Headline"
+                                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs font-extrabold text-white outline-none focus:border-amber-400"
+                               />
+                               <input
+                                 value={generatedCopyFields[1] || ''}
+                                 onChange={(event) => updateGeneratedCopy(i, 1, event.target.value)}
+                                 maxLength={100}
+                                 placeholder="Texto de apoio"
+                                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-gray-200 outline-none focus:border-amber-400"
+                               />
+                               <input
+                                 value={generatedCopyFields[2] || ''}
+                                 onChange={(event) => updateGeneratedCopy(i, 2, event.target.value)}
+                                 maxLength={32}
+                                 placeholder="CTA"
+                                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-400"
+                               />
+                               <textarea
+                                 value={generatedCopyFields[3] || ''}
+                                 onChange={(event) => updateGeneratedCopy(i, 3, event.target.value)}
+                                 rows={3}
+                                 maxLength={500}
+                                 placeholder="Cena visual específica desta pauta"
+                                 className="w-full resize-none rounded-lg border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-[11px] leading-relaxed text-sky-100 outline-none focus:border-sky-400"
+                               />
+                             </>
+                           ) : (
+                             <p className="text-xs text-gray-300">{JSON.stringify(out, null, 2)}</p>
+                           )}
+                           {typeof out === 'string' && (
+                             <div className="flex gap-2 border-t border-white/5 pt-2">
+                               <button
+                                 onClick={() => useCopyInCreative(out)}
+                                 className="flex-1 rounded-md bg-amber-400 px-2 py-1.5 text-[10px] font-black text-black hover:bg-amber-300"
                               >
                                 Usar esta copy
                               </button>
