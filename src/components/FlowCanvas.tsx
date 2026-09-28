@@ -55,6 +55,27 @@ export interface FlowConnection {
   to: string; // id do bloco destino
 }
 
+const FLOW_STORAGE_KEY = 'creative-flow-v2';
+
+const OUTPUT_TYPES: BlockType[] = ['copy-output', 'image-output', 'variations-output', 'batch-output'];
+
+const canConnectBlocks = (from: FlowBlock, to: FlowBlock) => {
+  if (from.id === to.id || !OUTPUT_TYPES.includes(to.type)) return false;
+  if (from.type === 'copy-output') return ['image-output', 'variations-output', 'batch-output'].includes(to.type);
+  if (from.type === 'image-output') return to.type === 'batch-output';
+  return !OUTPUT_TYPES.includes(from.type);
+};
+
+const parseGeneratedCopies = (output: FlowBlock['output']) => {
+  if (!Array.isArray(output)) return [];
+  return output.flatMap((line, index) => {
+    if (typeof line !== 'string' || line.startsWith('data:image')) return [];
+    const [headline = '', support = '', cta = ''] = line.split('|').map((part) => part.trim());
+    if (!headline && !support && !cta) return [];
+    return [{ id: `generated-copy-${index}`, headline, support, cta, visualPrompt: '' }];
+  });
+};
+
 interface FlowCanvasProps {
   apiKey: string;
   provider: 'openai' | 'Opus 4.8';
@@ -393,6 +414,7 @@ const TYPOGRAPHY_TEMPLATES: Array<{
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand }) => {
   const [blocks, setBlocks] = useState<FlowBlock[]>([]);
   const [connections, setConnections] = useState<FlowConnection[]>([]);
+  const [flowHydrated, setFlowHydrated] = useState(false);
   const [draggingBlock, setDraggingBlock] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
@@ -407,6 +429,28 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const [creativeLayout, setCreativeLayout] = useState<CreativeLayout>('editorial-left');
+
+  useEffect(() => {
+    let active = true;
+    loadFlowState(FLOW_STORAGE_KEY)
+      .then((saved) => {
+        if (!active || !saved) return;
+        setBlocks(Array.isArray(saved.blocks) ? saved.blocks : []);
+        setConnections(Array.isArray(saved.connections) ? saved.connections : []);
+        if (saved.creativeText) setCreativeText(saved.creativeText);
+      })
+      .catch(() => undefined)
+      .finally(() => active && setFlowHydrated(true));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!flowHydrated) return;
+    const timer = window.setTimeout(() => {
+      saveFlowState(FLOW_STORAGE_KEY, { blocks, connections, creativeText }).catch(() => undefined);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [blocks, connections, creativeText, flowHydrated]);
 
   // Posicionamento dos textos no preview (X/Y em %)
   const [textPositions, setTextPositions] = useState<TextPositions>(
@@ -628,12 +672,31 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
   const finishConnection = (blockId: string) => {
     if (!connecting) {
-      setConnectionMessage('Primeiro clique na SAÍDA de um bloco de Briefing, Logo, Referência ou Estilo.');
+      setConnectionMessage('Primeiro clique na SAÍDA do node que fornecerá os dados.');
       return;
     }
     if (connecting === blockId) {
       setConnecting(null);
       setConnectionMessage(null);
+      return;
+    }
+    const source = blocks.find((item) => item.id === connecting);
+    const target = blocks.find((item) => item.id === blockId);
+    if (!source || !target || !canConnectBlocks(source, target)) {
+      setConnecting(null);
+      setConnectionMessage('Esta conexão não é compatível com o node de destino.');
+      window.setTimeout(() => setConnectionMessage(null), 3000);
+      return;
+    }
+    const singleInputTypes: BlockType[] = ['briefing', 'logo', 'expert', 'style', 'typography', 'copies', 'copy-output'];
+    const hasSameInputType = singleInputTypes.includes(source.type) && connections.some((connection) => {
+      if (connection.to !== blockId) return false;
+      return blocks.find((item) => item.id === connection.from)?.type === source.type;
+    });
+    if (hasSameInputType) {
+      setConnecting(null);
+      setConnectionMessage(`Este node já possui uma entrada do tipo “${source.label}”. Remova a conexão atual primeiro.`);
+      window.setTimeout(() => setConnectionMessage(null), 3500);
       return;
     }
     const exists = connections.some((c) => c.from === connecting && c.to === blockId);
@@ -827,8 +890,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
 
     // Copys manuais conectadas (para emparelhar Copy[i] -> Imagem[i])
     const copiesBlock = inputBlocks.find((b) => b.type === 'copies');
+    const generatedCopiesBlock = inputBlocks.find((b) => b.type === 'copy-output');
     const copiesList: Array<{ id: string; headline: string; support: string; cta?: string; visualPrompt?: string }> =
-      (copiesBlock?.data?.items || []).filter(
+      (copiesBlock?.data?.items || parseGeneratedCopies(generatedCopiesBlock?.output)).filter(
         (c: any) => c && (c.headline?.trim() || c.support?.trim() || c.cta?.trim() || c.visualPrompt?.trim())
       );
 
@@ -855,8 +919,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       (block.type === 'batch-output' && copiesList.some((c) => c?.visualPrompt?.trim()));
     const hasImageOutputsWithVisualPrompts =
       block.type === 'image-output' && hasBlockVisualPrompt;
+    const hasCustomCopyPrompt =
+      block.type === 'copy-output' && String(block.data?.customPrompt || '').trim().length > 0;
 
-    if (!briefing && requiresBriefing && !hasImageOutputsWithVisualPrompts && !hasAnyCopyVisualPrompt) {
+    if (!briefing && requiresBriefing && !hasImageOutputsWithVisualPrompts && !hasAnyCopyVisualPrompt && !hasCustomCopyPrompt) {
       alert('Conecte um bloco "Briefing" ou preencha o campo "Prompt Visual deste bloco" (ou o "Prompt Visual" da copy) antes de gerar. Arraste da bolinha direita do Briefing para a esquerda deste bloco OU cole o prompt diretamente no bloco verde.');
       return;
     }
@@ -963,6 +1029,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           );
           if (url) {
             items.push(copyForThis ? { imageUrl: url, copy: copyForThis } : { imageUrl: url });
+            const partialImages = items.map((item) => item.imageUrl);
+            const partialCopies = items.map((item) => item.copy || null);
+            setBlocks((previous) => previous.map((item): FlowBlock =>
+              item.id === blockId
+                ? { ...item, output: partialImages, data: { ...item.data, pairedCopies: partialCopies } }
+                : item
+            ));
           }
         }
 
@@ -1120,6 +1193,21 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           >
             <Archive size={12} /> ZIP Todos
           </button>
+          <button
+            onClick={() => {
+              if (blocks.length === 0 || window.confirm('Limpar todos os nodes, conexões e resultados desta esteira?')) {
+                setBlocks([]);
+                setConnections([]);
+                setOutputModal(null);
+                setCreativeText({ headline: '', support: '', cta: '' });
+              }
+            }}
+            disabled={blocks.length === 0 || !!generating}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/30 disabled:opacity-40"
+            title="Apagar a esteira salva neste navegador"
+          >
+            <Trash2 size={12} /> Limpar
+          </button>
         </div>
       </div>
 
@@ -1219,7 +1307,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                 strokeWidth="2"
                 fill="none"
                 strokeDasharray="4 4"
-                className="animate-pulse"
+                className="animate-pulse pointer-events-auto cursor-pointer hover:stroke-rose-400"
+                onClick={() => setConnections((previous) => previous.filter((item) => item.id !== conn.id))}
               />
             );
           })}
@@ -1276,18 +1365,34 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     </button>
                   )}
                   {isOutput && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGenerate(block.id);
-                      }}
-                      disabled={generating === block.id}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${config.color.replace('text', 'bg')} ${config.color} hover:opacity-80 disabled:opacity-50 flex items-center gap-1`}
-                      title="Executar"
-                    >
-                      {generating === block.id ? <Loader2 size={9} className="animate-spin" /> : <Play size={9} />}
-                      {generating === block.id ? '...' : '▶'}
-                    </button>
+                    <>
+                      {(block.type === 'copy-output' || block.type === 'image-output') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startConnection(block.id);
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            connecting === block.id ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' : 'bg-white/10 text-gray-200'
+                          }`}
+                          title="Usar o resultado em outro node"
+                        >
+                          🔌 Saída
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGenerate(block.id);
+                        }}
+                        disabled={!!generating}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${config.color.replace('text', 'bg')} ${config.color} hover:opacity-80 disabled:opacity-50 flex items-center gap-1`}
+                        title="Executar"
+                      >
+                        {generating === block.id ? <Loader2 size={9} className="animate-spin" /> : <Play size={9} />}
+                        {generating === block.id ? '...' : '▶'}
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={(e) => {
@@ -3174,6 +3279,44 @@ const PasteMultipleCopiesModal: React.FC<PasteMultipleCopiesModalProps> = ({
 // =============================
 // HELPERS
 // =============================
+
+type PersistedFlow = {
+  blocks: FlowBlock[];
+  connections: FlowConnection[];
+  creativeText?: { headline: string; support: string; cta: string };
+};
+
+function openFlowDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('robo-criacao-flows', 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains('flows')) request.result.createObjectStore('flows');
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function loadFlowState(key: string): Promise<PersistedFlow | null> {
+  const database = await openFlowDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction('flows', 'readonly');
+    const request = transaction.objectStore('flows').get(key);
+    request.onsuccess = () => resolve((request.result as PersistedFlow | undefined) || null);
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => database.close();
+  });
+}
+
+async function saveFlowState(key: string, value: PersistedFlow): Promise<void> {
+  const database = await openFlowDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction('flows', 'readwrite');
+    transaction.objectStore('flows').put(value, key);
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+  });
+}
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
