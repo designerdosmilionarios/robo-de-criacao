@@ -563,6 +563,58 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     setBlocks((prev) => [...prev, newBlock]);
   };
 
+  const createSocialMediaFlow = () => {
+    if (blocks.length > 0 && !window.confirm('Substituir a esteira atual pelo modelo de Posts Sociais?')) return;
+    const stamp = Date.now();
+    const ids = {
+      briefing: `social-briefing-${stamp}`,
+      style: `social-style-${stamp}`,
+      copies: `social-copy-${stamp}`,
+      typography: `social-typography-${stamp}`,
+      expert: `social-expert-${stamp}`,
+      batch: `social-batch-${stamp}`,
+    };
+    const socialBlocks: FlowBlock[] = [
+      {
+        id: ids.briefing, type: 'briefing', label: 'Briefing Editorial', x: 40, y: 70,
+        data: { text: 'Negócio/produto:\nPúblico:\nProblema real:\nBenefício concreto:\nTom da comunicação:\nO que não deve aparecer:' },
+      },
+      {
+        id: ids.style, type: 'style', label: 'Direção Visual', x: 40, y: 360,
+        data: { tone: 'editorial contemporâneo, humano, específico e sem aparência de banco de imagens', color: brand?.primaryColor || '#10b981' },
+      },
+      {
+        id: ids.copies, type: 'copy-output', label: '9 Pautas Sociais', x: 340, y: 70,
+        data: {
+          count: 9,
+          customPrompt: 'Crie 9 posts distintos: 2 educativos, 2 de identificação, 1 quebra de mito, 1 erro comum, 1 bastidor, 1 autoridade e 1 convite. Headline curta, apoio complementar e CTA natural. Não invente dados, garantias ou resultados.',
+        },
+      },
+      {
+        id: ids.typography, type: 'typography', label: 'Tipografia Social', x: 340, y: 400,
+        data: getDefaultData('typography'),
+      },
+      {
+        id: ids.expert, type: 'expert', label: 'Foto do Especialista', x: 650, y: 400,
+        data: getDefaultData('expert'),
+      },
+      {
+        id: ids.batch, type: 'batch-output', label: '3 Provas · depois 9', x: 650, y: 70,
+        data: { count: 3, useIndividualPrompts: false, aspectRatio: '4:5', preferredModel: 'auto' },
+      },
+    ];
+    const links: Array<[string, string]> = [
+      [ids.briefing, ids.copies], [ids.style, ids.copies], [ids.briefing, ids.batch],
+      [ids.style, ids.batch], [ids.copies, ids.batch], [ids.typography, ids.batch], [ids.expert, ids.batch],
+    ];
+    setBlocks(socialBlocks);
+    setConnections(links.map(([from, to], index) => ({ id: `social-connection-${stamp}-${index}`, from, to })));
+    setCreativeLayout('editorial-left');
+    setTextPositions(CREATIVE_LAYOUTS['editorial-left'].positions);
+    setCreativeText({ headline: '', support: '', cta: '' });
+    setOutputModal(null);
+  };
+
   // Remover bloco
   const handleRemoveBlock = (id: string) => {
     setBlocks((prev) => prev.filter((b) => b.id !== id));
@@ -723,10 +775,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
     if (!preview) return;
     setDownloadingPreview(index);
     try {
+      const dimensions = getExportDimensions(getOutputAspectRatio(outputModal?.blockId));
       const dataUrl = await toPng(preview, {
         pixelRatio: 1,
-        canvasWidth: 1080,
-        canvasHeight: 1080,
+        canvasWidth: dimensions.width,
+        canvasHeight: dimensions.height,
         cacheBust: true,
       });
       saveAs(dataUrl, `criativo-esteira-${index + 1}.png`);
@@ -754,10 +807,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       for (let i = 0; i < images.length; i++) {
         const preview = document.getElementById(`flow-creative-preview-${i}`);
         if (!preview) continue;
+        const dimensions = getExportDimensions(getOutputAspectRatio(outputModal.blockId));
         const dataUrl = await toPng(preview, {
           pixelRatio: 1,
-          canvasWidth: 1080,
-          canvasHeight: 1080,
+          canvasWidth: dimensions.width,
+          canvasHeight: dimensions.height,
           cacheBust: true,
         });
         const base64 = dataUrl.split(',')[1];
@@ -836,6 +890,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
       .map((c) => blocks.find((b) => b.id === c.from))
       .filter(Boolean) as FlowBlock[];
     return inputBlocks.find((b) => b.type === 'typography')?.data;
+  };
+
+  const getOutputAspectRatio = (outputBlockId?: string) => {
+    if (!outputBlockId) return '1:1';
+    const outputBlock = blocks.find((item) => item.id === outputBlockId);
+    if (outputBlock?.data?.aspectRatio) return outputBlock.data.aspectRatio as string;
+    const firstImageSource = connections
+      .filter((connection) => connection.to === outputBlockId)
+      .map((connection) => blocks.find((item) => item.id === connection.from))
+      .find((item) => item?.type === 'image-output');
+    return firstImageSource?.data?.aspectRatio || '4:5';
   };
 
   // Renderizar texto com destaque de *palavras* entre asteriscos
@@ -938,7 +1003,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
         // Prompt personalizado tem prioridade sobre briefing/estilo
         const userPrompt = String(block.data?.customPrompt || '').trim();
         const desiredCount = Math.min(Math.max(parseInt(String(block.data?.count)) || 4, 1), 12);
-        const brief = userPrompt || `${briefing}. Tom: ${style?.tone || 'profissional'}.`;
+        const brief = userPrompt
+          ? [briefing, `Instruções editoriais: ${userPrompt}`, `Tom: ${style?.tone || 'profissional'}.`].filter(Boolean).join('\n')
+          : `${briefing}. Tom: ${style?.tone || 'profissional'}.`;
         const variations = await generateCopyVariations(brief, style, apiKey, desiredCount);
         if (variations[0]) useCopyInCreative(variations[0]);
         setBlocks((prev) =>
@@ -1023,9 +1090,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
             expertPreserve,
             sourceBlock.data?.preferredModel || 'auto',
             sourceBlock.data?.aspectRatio || '4:5',
-            sourceBlock.data?.aspectRatio === '9:16' ? '1024x1536'
+            sourceBlock.data?.aspectRatio === '16:9' ? '1792x1024'
               : sourceBlock.data?.aspectRatio === '1:1' ? '1024x1024'
-              : '1024x1536' // 4:5
+              : '1024x1792' // 4:5 e 9:16 usam a orientação vertical suportada pelo provedor
           );
           if (url) {
             items.push(copyForThis ? { imageUrl: url, copy: copyForThis } : { imageUrl: url });
@@ -1088,6 +1155,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
           🎨 Esteira IA — Conecte blocos para criar criativos
         </span>
         <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={createSocialMediaFlow}
+            disabled={!!generating}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-400/40 bg-gradient-to-r from-sky-500/20 to-violet-500/20 px-3 py-1.5 text-[11px] font-extrabold text-sky-200 shadow-lg shadow-sky-950/20 hover:border-sky-300 hover:from-sky-500/30 hover:to-violet-500/30 disabled:opacity-50"
+            title="Monta uma esteira pronta para nove posts sociais e começa com três provas"
+          >
+            <Target size={12} /> Posts Sociais
+          </button>
+          <div className="w-px h-6 bg-white/10 mx-1" />
           <button
             onClick={() => handleCreateBlock('briefing')}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/30"
@@ -2504,6 +2580,38 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     <p className="text-[8px] text-gray-500 leading-tight">
                       Tempo médio: ~{(block.data.count ?? 9) * 8}s
                     </p>
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <label className="space-y-0.5 text-[8px] font-bold uppercase text-cyan-300">
+                        Formato
+                        <select
+                          value={block.data.aspectRatio || '4:5'}
+                          onChange={(event) => setBlocks((previous) => previous.map((item) =>
+                            item.id === block.id ? { ...item, data: { ...item.data, aspectRatio: event.target.value } } : item
+                          ))}
+                          className="w-full rounded border border-cyan-500/30 bg-black/40 px-1.5 py-1 text-[10px] normal-case text-white"
+                        >
+                          <option value="4:5">4:5 Feed</option>
+                          <option value="1:1">1:1 Quadrado</option>
+                          <option value="9:16">9:16 Story</option>
+                          <option value="16:9">16:9 Paisagem</option>
+                        </select>
+                      </label>
+                      <label className="space-y-0.5 text-[8px] font-bold uppercase text-cyan-300">
+                        Modelo
+                        <select
+                          value={block.data.preferredModel || 'auto'}
+                          onChange={(event) => setBlocks((previous) => previous.map((item) =>
+                            item.id === block.id ? { ...item, data: { ...item.data, preferredModel: event.target.value } } : item
+                          ))}
+                          className="w-full rounded border border-cyan-500/30 bg-black/40 px-1.5 py-1 text-[10px] normal-case text-white"
+                        >
+                          <option value="auto">Auto</option>
+                          <option value="gpt-image-2.5-sunburst">Premium</option>
+                          <option value="gpt-image-2.5-flare">Balanceado</option>
+                          <option value="gpt-image-2">Rápido</option>
+                        </select>
+                      </label>
+                    </div>
                     <label className="flex items-center gap-1.5 pt-1 cursor-pointer">
                       <input
                         type="checkbox"
@@ -2834,7 +2942,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
                     <div key={i} className="rounded-xl border border-white/10 overflow-hidden bg-black/20">
                       {imageUrl ? (
                         <>
-                          <div id={`flow-creative-preview-${i}`} className="relative aspect-square overflow-hidden bg-black">
+                          <div id={`flow-creative-preview-${i}`} className={`relative ${getAspectClass(getOutputAspectRatio(outputModal.blockId))} overflow-hidden bg-black`}>
                             <img src={imageUrl} alt={`Resultado ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" />
                             <div
                               className="absolute inset-0 pointer-events-none"
@@ -3033,7 +3141,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({ apiKey, provider, brand 
               </div>
             ) : typeof outputModal.output === 'string' && outputModal.output.startsWith('data:image') ? (
               <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-                <div id="flow-creative-preview-0" className="relative aspect-square overflow-hidden bg-black">
+                <div id="flow-creative-preview-0" className={`relative ${getAspectClass(getOutputAspectRatio(outputModal.blockId))} overflow-hidden bg-black`}>
                   <img src={outputModal.output} alt="Resultado" className="absolute inset-0 h-full w-full object-cover" />
                   {logoUrlForModal && (
                     <img
@@ -3279,6 +3387,20 @@ const PasteMultipleCopiesModal: React.FC<PasteMultipleCopiesModalProps> = ({
 // =============================
 // HELPERS
 // =============================
+
+function getAspectClass(aspectRatio: string) {
+  if (aspectRatio === '4:5') return 'aspect-[4/5]';
+  if (aspectRatio === '9:16') return 'aspect-[9/16]';
+  if (aspectRatio === '16:9') return 'aspect-video';
+  return 'aspect-square';
+}
+
+function getExportDimensions(aspectRatio: string) {
+  if (aspectRatio === '4:5') return { width: 1080, height: 1350 };
+  if (aspectRatio === '9:16') return { width: 1080, height: 1920 };
+  if (aspectRatio === '16:9') return { width: 1920, height: 1080 };
+  return { width: 1080, height: 1080 };
+}
 
 type PersistedFlow = {
   blocks: FlowBlock[];
